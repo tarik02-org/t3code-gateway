@@ -13,7 +13,15 @@ export const layer = Layer.effectDiscard(
     const router = yield* HttpRouter.HttpRouter;
     const config = yield* GatewayRuntimeConfig;
     const t3codeWebStaticRoot = Option.getOrNull(config.t3codeWebStaticRoot);
-    if (t3codeWebStaticRoot === null) {
+    if (config.t3codeWebEnabled === false || t3codeWebStaticRoot === null) {
+      yield* router.add("GET", "/", () =>
+        Effect.succeed(
+          HttpServerResponse.redirect("/admin", {
+            status: 302,
+            headers: { "cache-control": "no-store" },
+          }),
+        ),
+      );
       return;
     }
 
@@ -31,7 +39,12 @@ export const layer = Layer.effectDiscard(
         Effect.catchTags({
           PlatformError: (error) =>
             error.reason["_tag"] === "NotFound"
-              ? Effect.succeed(HttpServerResponse.text("Not Found", { status: 404 }))
+              ? Effect.succeed(
+                  HttpServerResponse.redirect("/admin", {
+                    status: 302,
+                    headers: { "cache-control": "no-store" },
+                  }),
+                )
               : Effect.fail(error),
         }),
       ),

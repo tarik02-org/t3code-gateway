@@ -1,8 +1,10 @@
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { AuthService } from "../auth/service.ts";
+import { GatewayRuntimeConfig } from "../config.ts";
 import { readSessionToken } from "./cookies.ts";
 
 const publicGatewayRoutes = new Set([
@@ -28,7 +30,10 @@ const isT3CodeAssetPath = (path: string) =>
   publicT3CodeAssetPaths.has(path) ||
   (path !== "/index.html" && lastPathSegment(path).includes("."));
 
-const sessionRequiredFor = (request: HttpServerRequest.HttpServerRequest) => {
+const sessionRequiredFor = (
+  request: HttpServerRequest.HttpServerRequest,
+  t3codeWebAvailable: boolean,
+) => {
   const path = pathname(request.url);
 
   if (publicGatewayRoutes.has(`${request.method} ${path}`)) {
@@ -53,6 +58,10 @@ const sessionRequiredFor = (request: HttpServerRequest.HttpServerRequest) => {
 
   if (path === "/admin" || path.startsWith("/admin/")) {
     return true;
+  }
+
+  if (path === "/" && t3codeWebAvailable === false) {
+    return false;
   }
 
   return !isT3CodeAssetPath(path);
@@ -81,12 +90,15 @@ export const sessionGuard = <E, R>(
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   E,
-  HttpServerRequest.HttpServerRequest | AuthService | R
+  HttpServerRequest.HttpServerRequest | AuthService | GatewayRuntimeConfig | R
 > =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const config = yield* GatewayRuntimeConfig;
+    const t3codeWebAvailable =
+      config.t3codeWebEnabled === true && Option.isSome(config.t3codeWebStaticRoot);
 
-    if (!sessionRequiredFor(request)) {
+    if (!sessionRequiredFor(request, t3codeWebAvailable)) {
       return yield* handler;
     }
 

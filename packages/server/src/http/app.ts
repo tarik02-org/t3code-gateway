@@ -120,7 +120,7 @@ const t3codeWebStaticLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* GatewayRuntimeConfig;
     const t3codeWebStaticRoot = Option.getOrNull(config.t3codeWebStaticRoot);
-    if (t3codeWebStaticRoot === null) {
+    if (config.t3codeWebEnabled === false || t3codeWebStaticRoot === null) {
       return Layer.empty;
     }
 

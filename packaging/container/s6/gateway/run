@@ -17,7 +17,7 @@ fi
 
 if [ ! -f "${T3_GATEWAY_SECRET_KEY_FILE}" ]; then
   umask 077
-  openssl rand 32 >"${T3_GATEWAY_SECRET_KEY_FILE}"
+  head -c 32 /dev/urandom >"${T3_GATEWAY_SECRET_KEY_FILE}"
 fi
 
 if [ -z "${T3_GATEWAY_TRAEFIK_DYNAMIC_FILE+x}" ]; then

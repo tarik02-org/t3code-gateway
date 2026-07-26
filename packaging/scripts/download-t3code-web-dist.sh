@@ -39,4 +39,5 @@ else
   fi
 fi
 
+find "${dist_dir}" -type f -name '*.map' -exec rm -f {} +
 rm -f "${archive_path}"

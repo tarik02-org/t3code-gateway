@@ -30,8 +30,8 @@ function LoginPage() {
   });
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-background px-4 py-8 text-foreground">
-      <section className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl shadow-black/20">
+    <main className="grid min-h-dvh place-items-center px-4 py-8 text-foreground">
+      <section className="dialog-glass w-full max-w-sm rounded-2xl border p-5 text-card-foreground">
         <div className="mb-5 flex items-center gap-3">
           <T3Logo className="h-3" />
           <div>

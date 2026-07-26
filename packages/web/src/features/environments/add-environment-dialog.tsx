@@ -56,7 +56,7 @@ export function AddEnvironmentDialog() {
         }
       }}
     >
-      <DialogPopup className="max-w-xl border-border/60">
+      <DialogPopup className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Add environment</DialogTitle>
         </DialogHeader>

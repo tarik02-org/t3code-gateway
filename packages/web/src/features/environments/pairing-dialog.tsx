@@ -15,7 +15,6 @@ import { Label } from "../../components/ui/label.tsx";
 import { QRCodeSvg } from "../../components/ui/qr-code.tsx";
 import { Switch } from "../../components/ui/switch.tsx";
 import { createEnvironmentPairingLink } from "../../lib/gateway-api.ts";
-import { cn } from "../../lib/utils.ts";
 import { Field } from "./field.tsx";
 import { usePairingDialogStore } from "./pairing-dialog-store.ts";
 import { PAIRING_SCOPE_OPTIONS } from "./pairing-scopes.ts";
@@ -67,18 +66,24 @@ export function PairingDialog() {
       }}
     >
       <DialogPopup
-        className={cn(
-          "border-border/60",
+        className={
           isShowingQrResult
             ? "w-[min(calc(100vw-2rem),calc(100dvh-10rem),42rem)] max-w-none"
-            : "max-w-xl",
-        )}
+            : "max-w-xl"
+        }
       >
         <DialogHeader>
           <DialogTitle>{pairingLink === null ? "Create pairing link" : "Pairing link"}</DialogTitle>
         </DialogHeader>
         {pairingLink === null ? (
-          <>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canSubmit === true && createMutation.isPending === false) {
+                createMutation.mutate();
+              }
+            }}
+          >
             <DialogPanel className="space-y-5">
               <Field
                 label="Client label"
@@ -92,6 +97,7 @@ export function PairingDialog() {
                   <div className="flex gap-1">
                     <Button
                       size="xs"
+                      type="button"
                       variant="outline"
                       disabled={createMutation.isPending}
                       onClick={setReadOnlyScopes}
@@ -100,6 +106,7 @@ export function PairingDialog() {
                     </Button>
                     <Button
                       size="xs"
+                      type="button"
                       variant="outline"
                       disabled={createMutation.isPending}
                       onClick={setStandardScopes}
@@ -108,10 +115,10 @@ export function PairingDialog() {
                     </Button>
                   </div>
                 </div>
-                <div className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
+                <div className="flex flex-col gap-1">
                   {PAIRING_SCOPE_OPTIONS.map(({ scope, title, description }) => (
                     <label
-                      className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                      className="flex cursor-pointer items-start justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/20"
                       key={scope}
                     >
                       <span className="min-w-0">
@@ -142,29 +149,26 @@ export function PairingDialog() {
             <DialogFooter>
               <Button
                 size="xs"
+                type="button"
                 variant="outline"
                 disabled={createMutation.isPending}
                 onClick={() => setOpen(false)}
               >
                 Cancel
               </Button>
-              <Button
-                size="xs"
-                disabled={createMutation.isPending || !canSubmit}
-                onClick={() => createMutation.mutate()}
-              >
+              <Button size="xs" type="submit" disabled={createMutation.isPending || !canSubmit}>
                 {createMutation.isPending ? "Creating..." : "Create link"}
               </Button>
             </DialogFooter>
-          </>
+          </form>
         ) : (
           <>
             <DialogPanel className={isShowingQrResult ? "p-4 sm:p-5" : "space-y-4"}>
               {isShowingQrResult ? (
-                <div className="mx-auto aspect-square w-full">
+                <div className="mx-auto aspect-square w-full max-w-80">
                   <QRCodeSvg
                     value={pairingLink.pairingUrl}
-                    size={640}
+                    size={320}
                     level="M"
                     marginSize={2}
                     title="Pairing link"
@@ -179,12 +183,28 @@ export function PairingDialog() {
               )}
             </DialogPanel>
             <DialogFooter className="sm:justify-between">
-              <Button size="xs" variant="outline" onClick={togglePairingResultView}>
+              <Button size="xs" type="button" variant="outline" onClick={togglePairingResultView}>
                 {pairingResultView === "qr" ? "Show link" : "Show QR"}
               </Button>
-              <Button size="xs" onClick={() => setOpen(false)}>
-                Done
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const openedWindow = window.open(pairingLink.pairingUrl, "_blank");
+                    if (openedWindow !== null) {
+                      openedWindow.opener = null;
+                      window.close();
+                    }
+                  }}
+                >
+                  Open
+                </Button>
+                <Button size="xs" type="button" onClick={() => setOpen(false)}>
+                  Done
+                </Button>
+              </div>
             </DialogFooter>
           </>
         )}

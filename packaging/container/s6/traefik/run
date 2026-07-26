@@ -1,6 +1,15 @@
 #!/command/with-contenv sh
 set -eu
 
+case "${T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED:-false}" in
+  true) ;;
+  false) exec s6-pause ;;
+  *)
+    echo "T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED must be true or false" >&2
+    exit 100
+    ;;
+esac
+
 data_dir="${T3_GATEWAY_DATA_DIR:-/data}"
 dynamic_file="${T3_GATEWAY_TRAEFIK_DYNAMIC_FILE:-${data_dir}/traefik/environments.yml}"
 static_config="${T3_GATEWAY_TRAEFIK_STATIC_CONFIG:-/etc/traefik/traefik.yml}"
