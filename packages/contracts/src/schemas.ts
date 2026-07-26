@@ -7,6 +7,7 @@ export const GatewayStatus = Schema.Struct({
     migrated: Schema.Boolean,
   }),
   t3codeWeb: Schema.Struct({
+    available: Schema.Boolean,
     buildId: Schema.optional(Schema.String),
   }),
 });

@@ -14,6 +14,7 @@ export const buildGatewayStatus = Effect.gen(function* () {
       migrated: true,
     },
     t3codeWeb: {
+      available: config.t3codeWebEnabled === true && Option.isSome(config.t3codeWebStaticRoot),
       buildId: Option.getOrUndefined(config.t3codeWebBuildId),
     },
   };
