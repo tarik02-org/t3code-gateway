@@ -26,8 +26,8 @@ export function AdminShell({
   const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
-    <main className="flex h-dvh flex-col bg-background text-foreground">
-      <header className="flex h-13 shrink-0 items-center gap-2 border-b border-border/60 bg-background/88 px-4 backdrop-blur">
+    <main className="flex h-dvh flex-col text-foreground">
+      <header className="flex h-13 shrink-0 items-center gap-2 bg-background/88 px-4 backdrop-blur">
         <div className="flex h-8 w-auto items-center">
           <T3Logo />
         </div>
@@ -40,7 +40,9 @@ export function AdminShell({
         {actions}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4">{children}</div>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-7 sm:px-8 sm:py-10">
+          {children}
+        </div>
       </div>
       <ResetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </main>
@@ -87,7 +89,7 @@ function ResetPasswordDialog({
         }
       }}
     >
-      <DialogPopup className="max-w-md border-border/60">
+      <DialogPopup className="max-w-md">
         <DialogHeader>
           <DialogTitle>Reset password</DialogTitle>
         </DialogHeader>

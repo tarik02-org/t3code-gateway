@@ -15,7 +15,6 @@ import { Label } from "../../components/ui/label.tsx";
 import { QRCodeSvg } from "../../components/ui/qr-code.tsx";
 import { Switch } from "../../components/ui/switch.tsx";
 import { createEnvironmentPairingLink } from "../../lib/gateway-api.ts";
-import { cn } from "../../lib/utils.ts";
 import { Field } from "./field.tsx";
 import { usePairingDialogStore } from "./pairing-dialog-store.ts";
 import { PAIRING_SCOPE_OPTIONS } from "./pairing-scopes.ts";
@@ -67,12 +66,11 @@ export function PairingDialog() {
       }}
     >
       <DialogPopup
-        className={cn(
-          "border-border/60",
+        className={
           isShowingQrResult
             ? "w-[min(calc(100vw-2rem),calc(100dvh-10rem),42rem)] max-w-none"
-            : "max-w-xl",
-        )}
+            : "max-w-xl"
+        }
       >
         <DialogHeader>
           <DialogTitle>{pairingLink === null ? "Create pairing link" : "Pairing link"}</DialogTitle>
@@ -117,10 +115,10 @@ export function PairingDialog() {
                     </Button>
                   </div>
                 </div>
-                <div className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
+                <div className="flex flex-col gap-1">
                   {PAIRING_SCOPE_OPTIONS.map(({ scope, title, description }) => (
                     <label
-                      className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                      className="flex cursor-pointer items-start justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/20"
                       key={scope}
                     >
                       <span className="min-w-0">

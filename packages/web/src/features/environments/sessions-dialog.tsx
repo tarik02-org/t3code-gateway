@@ -91,7 +91,7 @@ export function SessionsDialog() {
           }
         }}
       >
-        <DialogPopup className="h-[min(34rem,calc(100dvh-2rem))] max-w-2xl border-border/60">
+        <DialogPopup className="h-[min(34rem,calc(100dvh-2rem))] max-w-2xl">
           <DialogHeader>
             <DialogTitle>Authorized clients</DialogTitle>
           </DialogHeader>
@@ -159,7 +159,7 @@ function ClientSessionsSection({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm/4">
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card text-card-foreground">
       {error !== null ? (
         <ClientSessionsMessage className="text-destructive-foreground">
           {error}
@@ -183,9 +183,9 @@ function ClientSessionsSection({
 
 function ClientSessionsSkeleton() {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm/4">
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card text-card-foreground">
       {[0, 1, 2].map((row) => (
-        <div className="border-t border-border/60 px-4 py-3.5 first:border-t-0 sm:px-5" key={row}>
+        <div className="border-t border-border/60 px-4 py-3 first:border-t-0 sm:px-5" key={row}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center gap-1.5">
@@ -220,7 +220,7 @@ function ClientSessionRow({
       clientSession.subject);
 
   return (
-    <div className="border-t border-border/60 px-4 py-3.5 first:border-t-0 sm:px-5">
+    <div className="border-t border-border/60 px-4 py-3 transition-colors first:border-t-0 hover:bg-muted/20 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex min-h-5 items-center gap-1.5">
@@ -232,13 +232,13 @@ function ClientSessionRow({
                   : "bg-muted-foreground/30",
               )}
             />
-            <h3 className="truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+            <h3 className="truncate text-sm font-medium tracking-[-0.005em] text-foreground">
               {label}
             </h3>
             {clientSession.current ? <ClientBadge>This device</ClientBadge> : null}
             {clientSession.gatewayRole === "admin" ? <ClientBadge>Admin</ClientBadge> : null}
           </div>
-          <p className="truncate text-xs text-muted-foreground/80">
+          <p className="truncate text-[13px] leading-[1.45] text-muted-foreground/80">
             {details.length > 0 ? (
               <>
                 {details}
