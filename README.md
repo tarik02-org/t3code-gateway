@@ -33,6 +33,42 @@ The gateway is not a hosted control plane and does not proxy normal T3 Code traf
 
 ![Authorized clients](.github/screenshots/authorized-clients.png)
 
+### Regenerating screenshots
+
+Build the admin web dist. For local capture, install Chromium once, then capture all six screenshots:
+
+```sh
+pnpm --filter @t3code-gateway/web build
+pnpm screenshots:install
+pnpm screenshots local
+```
+
+Add `--headful` to watch the local capture. Use `--executable-path /path/to/chromium` when the host
+provides its own Chromium binary. To connect to an existing Chromium instance over CDP instead:
+
+```sh
+pnpm screenshots cdp \
+  --cdp-url http://127.0.0.1:9222
+```
+
+To create a temporary no-snapshot Aperture browser at DPR 2, capture through its CDP endpoint, and
+delete the session afterward:
+
+```sh
+APERTURE_BASE_URL=https://aperture.example.com \
+APERTURE_TOKEN=apt_... \
+pnpm screenshots aperture
+```
+
+Set `APERTURE_TENANT_ID` as well when using a system-admin token. The same credentials can be passed
+with `--base-url`, `--token`, and `--tenant-id`.
+
+The capture tool expects the admin web dist to exist, serves it through an in-browser virtual origin,
+intercepts gateway RPC calls with deterministic fake environments and clients, clicks each UI state,
+derives viewport heights from the rendered content, and replaces the PNG files in
+`.github/screenshots`. Pass `--output <directory>` to write elsewhere. It does not start an HTTP
+server.
+
 ## How It Works
 
 T3 Code Gateway has three surfaces:

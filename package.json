@@ -30,6 +30,8 @@
     "build": "vp run -r build",
     "download:t3code-web": "sh packaging/scripts/download-t3code-web-dist.sh",
     "package:runtime": "sh packaging/runtime/prepare.sh",
+    "screenshots": "pnpm --filter @t3code-gateway/screenshots capture",
+    "screenshots:install": "pnpm --filter @t3code-gateway/screenshots install:chromium",
     "changeset": "changeset",
     "changeset:version": "changeset version && node packaging/scripts/sync-root-version.mjs",
     "typecheck": "vp run -r typecheck",
