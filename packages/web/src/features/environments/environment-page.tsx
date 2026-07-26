@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { AdminShell } from "../../components/admin-shell.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import { getCurrentUser, listEnvironments } from "../../lib/gateway-api.ts";
+import { getCurrentUser, getGatewayStatus, listEnvironments } from "../../lib/gateway-api.ts";
 import { AddEnvironmentDialog } from "./add-environment-dialog.tsx";
 import { useAddEnvironmentDialogStore } from "./add-environment-store.ts";
 import { EditEnvironmentDialog } from "./edit-environment-dialog.tsx";
@@ -13,7 +13,12 @@ import { useEditEnvironmentDialogStore } from "./edit-environment-store.ts";
 import { EnvironmentTable, EnvironmentTableSkeleton } from "./environment-table.tsx";
 import { PairingDialog } from "./pairing-dialog.tsx";
 import { usePairingDialogStore } from "./pairing-dialog-store.ts";
-import { ENVIRONMENTS_QUERY_KEY, CURRENT_USER_QUERY_KEY, IS_BROWSER } from "./query-keys.ts";
+import {
+  CURRENT_USER_QUERY_KEY,
+  ENVIRONMENTS_QUERY_KEY,
+  GATEWAY_STATUS_QUERY_KEY,
+  IS_BROWSER,
+} from "./query-keys.ts";
 import { SessionsDialog } from "./sessions-dialog.tsx";
 import { useSessionsDialogStore } from "./sessions-dialog-store.ts";
 import { useT3CodeCatalogStore } from "./t3code-catalog-store.ts";
@@ -38,6 +43,12 @@ export function EnvironmentPage() {
     enabled: IS_BROWSER && currentUserQuery.data != null,
   });
 
+  const gatewayStatusQuery = useQuery({
+    queryKey: GATEWAY_STATUS_QUERY_KEY,
+    queryFn: getGatewayStatus,
+    enabled: IS_BROWSER && currentUserQuery.data != null,
+  });
+
   useEffect(() => {
     if (currentUserQuery.isSuccess && currentUserQuery.data === null) {
       void navigate({ to: "/login" });
@@ -45,10 +56,14 @@ export function EnvironmentPage() {
   }, [currentUserQuery.data, currentUserQuery.isSuccess, navigate]);
 
   useEffect(() => {
-    if (currentUserQuery.data !== null && currentUserQuery.data !== undefined) {
+    if (
+      currentUserQuery.data !== null &&
+      currentUserQuery.data !== undefined &&
+      gatewayStatusQuery.data?.t3codeWeb.available === true
+    ) {
       void loadT3CodeCatalog();
     }
-  }, [currentUserQuery.data, loadT3CodeCatalog]);
+  }, [currentUserQuery.data, gatewayStatusQuery.data?.t3codeWeb.available, loadT3CodeCatalog]);
 
   if (
     !IS_BROWSER ||
@@ -58,7 +73,7 @@ export function EnvironmentPage() {
   ) {
     return (
       <AdminShell>
-        <EnvironmentTableSkeleton />
+        <EnvironmentTableSkeleton showWebColumn={false} />
       </AdminShell>
     );
   }
@@ -81,13 +96,16 @@ export function EnvironmentPage() {
       ) : null}
 
       {environmentsQuery.isLoading ? (
-        <EnvironmentTableSkeleton />
+        <EnvironmentTableSkeleton
+          showWebColumn={gatewayStatusQuery.data?.t3codeWeb.available === true}
+        />
       ) : (
         <EnvironmentTable
           environments={environmentsQuery.data ?? []}
           onEdit={openEditDialog}
           onSessions={openSessionsDialog}
           onPair={openPairingDialog}
+          showWebColumn={gatewayStatusQuery.data?.t3codeWeb.available === true}
         />
       )}
 

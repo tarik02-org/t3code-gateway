@@ -16,6 +16,7 @@ import {
   deleteEnvironment,
   updateEnvironment,
 } from "../../lib/gateway-api.ts";
+import { cn } from "../../lib/utils.ts";
 import { ENVIRONMENTS_QUERY_KEY } from "./query-keys.ts";
 import { useT3CodeCatalogPopoverStore } from "./t3code-catalog-popover-store.ts";
 import { useT3CodeCatalogStore } from "./t3code-catalog-store.ts";
@@ -25,11 +26,13 @@ export function EnvironmentTable({
   onEdit,
   onPair,
   onSessions,
+  showWebColumn,
 }: Readonly<{
   environments: ReadonlyArray<EnvironmentRecord>;
   onEdit: (environment: EnvironmentRecord) => void;
   onPair: (environment: EnvironmentRecord) => void;
   onSessions: (environment: EnvironmentRecord) => void;
+  showWebColumn: boolean;
 }>) {
   if (environments.length === 0) {
     return (
@@ -41,15 +44,20 @@ export function EnvironmentTable({
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
-      <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
-        <EnvironmentTableColumns />
+      <table
+        className={cn(
+          "w-full table-fixed text-left text-xs",
+          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
+        )}
+      >
+        <EnvironmentTableColumns showWebColumn={showWebColumn} />
         <thead className="border-b border-border bg-muted/40 text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
-            <th className="px-2 py-3 text-center font-medium">Web</th>
+            {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
           </tr>
         </thead>
@@ -78,9 +86,11 @@ export function EnvironmentTable({
               <td className="px-2 py-3 text-center">
                 <EnvironmentEnabledSwitch environment={environment} />
               </td>
-              <td className="px-2 py-3 text-center">
-                <T3CodeCatalogSwitch environment={environment} />
-              </td>
+              {showWebColumn ? (
+                <td className="px-2 py-3 text-center">
+                  <T3CodeCatalogSwitch environment={environment} />
+                </td>
+              ) : null}
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-2">
                   <Button size="xs" variant="outline" onClick={() => onPair(environment)}>
@@ -187,18 +197,23 @@ function DeleteEnvironmentButton({
   );
 }
 
-export function EnvironmentTableSkeleton() {
+export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebColumn: boolean }>) {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-      <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
-        <EnvironmentTableColumns />
+      <table
+        className={cn(
+          "w-full table-fixed text-left text-xs",
+          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
+        )}
+      >
+        <EnvironmentTableColumns showWebColumn={showWebColumn} />
         <thead className="border-b border-border bg-muted/40 text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
-            <th className="px-2 py-3 text-center font-medium">Web</th>
+            {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
           </tr>
         </thead>
@@ -217,9 +232,11 @@ export function EnvironmentTableSkeleton() {
               <td className="px-2 py-3">
                 <Skeleton className="mx-auto h-5 w-9 rounded-full" />
               </td>
-              <td className="px-2 py-3">
-                <Skeleton className="mx-auto h-5 w-9 rounded-full" />
-              </td>
+              {showWebColumn ? (
+                <td className="px-2 py-3">
+                  <Skeleton className="mx-auto h-5 w-9 rounded-full" />
+                </td>
+              ) : null}
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-2">
                   <Skeleton className="h-6 w-10 rounded-md" />
@@ -236,14 +253,14 @@ export function EnvironmentTableSkeleton() {
   );
 }
 
-function EnvironmentTableColumns() {
+function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: boolean }>) {
   return (
     <colgroup>
       <col className="w-[16%]" />
       <col className="w-[13%]" />
       <col />
       <col className="w-18" />
-      <col className="w-16" />
+      {showWebColumn ? <col className="w-16" /> : null}
       <col className="w-64" />
     </colgroup>
   );
