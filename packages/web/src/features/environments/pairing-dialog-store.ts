@@ -3,6 +3,8 @@ import { create } from "zustand";
 
 import { AUTH_ORCHESTRATION_READ_SCOPE, AUTH_STANDARD_CLIENT_SCOPES } from "./pairing-scopes.ts";
 
+const pairingClientLabelStorageKey = "t3code-gateway:pairing-client-label";
+
 interface PairingDialogState {
   readonly open: boolean;
   readonly environment: EnvironmentRecord | null;
@@ -37,14 +39,17 @@ export const usePairingDialogStore = create<PairingDialogState>((set) => ({
     set({
       open: true,
       environment,
-      clientLabel: "",
+      clientLabel: window.localStorage.getItem(pairingClientLabelStorageKey) ?? "",
       scopes: AUTH_STANDARD_CLIENT_SCOPES,
       pairingLink: null,
       pairingResultView: "details",
       error: null,
     }),
   setOpen: (open) => set({ open }),
-  setClientLabel: (clientLabel) => set({ clientLabel }),
+  setClientLabel: (clientLabel) => {
+    window.localStorage.setItem(pairingClientLabelStorageKey, clientLabel);
+    set({ clientLabel });
+  },
   setScopes: (scopes) => set({ scopes }),
   setReadOnlyScopes: () => set({ scopes: [AUTH_ORCHESTRATION_READ_SCOPE] }),
   setStandardScopes: () => set({ scopes: AUTH_STANDARD_CLIENT_SCOPES }),
