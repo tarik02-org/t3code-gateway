@@ -18,7 +18,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "application-name", content: "T3 Code Gateway" },
       { name: "apple-mobile-web-app-title", content: "T3 Code Gateway" },
       { name: "description", content: "T3 Code Gateway admin console" },
-      { name: "theme-color", content: "#161616" },
+      { name: "theme-color", content: "#0a0a0a" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

@@ -33,17 +33,17 @@ export function EnvironmentTable({
 }>) {
   if (environments.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
         No environments.
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-xs">
+    <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card">
       <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
         <EnvironmentTableColumns />
-        <thead className="border-b border-border bg-muted/40 text-muted-foreground">
+        <thead className="border-b border-border/60 bg-foreground/[0.025] text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
@@ -55,7 +55,10 @@ export function EnvironmentTable({
         </thead>
         <tbody>
           {environments.map((environment) => (
-            <tr className="border-b border-border last:border-b-0" key={environment.environmentId}>
+            <tr
+              className="border-b border-border/60 transition-colors last:border-b-0 hover:bg-muted/20"
+              key={environment.environmentId}
+            >
               <td className="truncate px-4 py-3">{environment.label}</td>
               <td className="truncate px-4 py-3 font-mono text-xs">{environment.slug}</td>
               <td className="px-4 py-3">
@@ -189,10 +192,10 @@ function DeleteEnvironmentButton({
 
 export function EnvironmentTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
       <table className="w-full min-w-[1040px] table-fixed text-left text-xs">
         <EnvironmentTableColumns />
-        <thead className="border-b border-border bg-muted/40 text-muted-foreground">
+        <thead className="border-b border-border/60 bg-foreground/[0.025] text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
@@ -204,7 +207,7 @@ export function EnvironmentTableSkeleton() {
         </thead>
         <tbody>
           {[0, 1, 2].map((row) => (
-            <tr className="border-b border-border last:border-b-0" key={row}>
+            <tr className="border-b border-border/60 last:border-b-0" key={row}>
               <td className="px-4 py-3">
                 <Skeleton className="h-4 w-32 rounded-full" />
               </td>

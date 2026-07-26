@@ -62,7 +62,7 @@ export function EditEnvironmentDialog() {
         }
       }}
     >
-      <DialogPopup className="max-w-xl border-border/60">
+      <DialogPopup className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Edit environment</DialogTitle>
         </DialogHeader>
