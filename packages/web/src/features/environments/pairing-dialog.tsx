@@ -38,17 +38,14 @@ export function PairingDialog() {
   const reset = usePairingDialogStore((state) => state.reset);
   const canSubmit = environment !== null && clientLabel.length > 0 && scopes.length > 0;
   const isShowingQrResult = pairingLink !== null && pairingResultView === "qr";
+  const formId = "create-pairing-link-form";
 
   const createMutation = useMutation({
-    mutationFn: () => {
-      if (environment === null) {
-        throw new Error("Environment is not selected");
-      }
-      return createEnvironmentPairingLink(environment.environmentId, {
+    mutationFn: (environmentId: string) =>
+      createEnvironmentPairingLink(environmentId, {
         label: clientLabel,
         scopes,
-      });
-    },
+      }),
     onSuccess: setPairingLink,
     onError: (cause) => {
       setError(cause instanceof Error ? cause.message : "Create failed");
@@ -76,75 +73,83 @@ export function PairingDialog() {
           <DialogTitle>{pairingLink === null ? "Create pairing link" : "Pairing link"}</DialogTitle>
         </DialogHeader>
         {pairingLink === null ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (canSubmit === true && createMutation.isPending === false) {
-                createMutation.mutate();
-              }
-            }}
-          >
-            <DialogPanel className="space-y-5">
-              <Field
-                label="Client label"
-                value={clientLabel}
-                onChange={setClientLabel}
-                placeholder="MacBook"
-              />
-              <section className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <Label>Permissions</Label>
-                  <div className="flex gap-1">
-                    <Button
-                      size="xs"
-                      type="button"
-                      variant="outline"
-                      disabled={createMutation.isPending}
-                      onClick={setReadOnlyScopes}
-                    >
-                      Read only
-                    </Button>
-                    <Button
-                      size="xs"
-                      type="button"
-                      variant="outline"
-                      disabled={createMutation.isPending}
-                      onClick={setStandardScopes}
-                    >
-                      Standard
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {PAIRING_SCOPE_OPTIONS.map(({ scope, title, description }) => (
-                    <label
-                      className="flex cursor-pointer items-start justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/20"
-                      key={scope}
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-xs font-medium text-foreground">{title}</span>
-                        <span className="block text-xs leading-snug text-muted-foreground">
-                          {description}
-                        </span>
-                      </span>
-                      <Switch
-                        className="mt-0.5"
-                        checked={scopes.includes(scope)}
+          <>
+            <DialogPanel>
+              <form
+                id={formId}
+                className="flex flex-col gap-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (
+                    canSubmit === true &&
+                    createMutation.isPending === false &&
+                    environment !== null
+                  ) {
+                    createMutation.mutate(environment.environmentId);
+                  }
+                }}
+              >
+                <Field
+                  label="Client label"
+                  value={clientLabel}
+                  onChange={setClientLabel}
+                  placeholder="MacBook"
+                />
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Permissions</Label>
+                    <div className="flex gap-1">
+                      <Button
+                        size="xs"
+                        type="button"
+                        variant="outline"
                         disabled={createMutation.isPending}
-                        onCheckedChange={(checked) => toggleScope(scope, checked)}
-                      />
-                    </label>
-                  ))}
-                </div>
-                {scopes.length === 0 ? (
-                  <p className="text-xs text-destructive-foreground">
-                    Select at least one permission.
-                  </p>
+                        onClick={setReadOnlyScopes}
+                      >
+                        Read only
+                      </Button>
+                      <Button
+                        size="xs"
+                        type="button"
+                        variant="outline"
+                        disabled={createMutation.isPending}
+                        onClick={setStandardScopes}
+                      >
+                        Standard
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
+                    {PAIRING_SCOPE_OPTIONS.map(({ scope, title, description }) => (
+                      <label
+                        className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                        key={scope}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-xs font-medium text-foreground">{title}</span>
+                          <span className="block text-xs leading-snug text-muted-foreground">
+                            {description}
+                          </span>
+                        </span>
+                        <Switch
+                          className="mt-0.5"
+                          checked={scopes.includes(scope)}
+                          disabled={createMutation.isPending}
+                          onCheckedChange={(checked) => toggleScope(scope, checked)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {scopes.length === 0 ? (
+                    <p className="text-xs text-destructive-foreground">
+                      Select at least one permission.
+                    </p>
+                  ) : null}
+                </section>
+                {error !== null ? (
+                  <p className="text-sm text-destructive-foreground">{error}</p>
                 ) : null}
-              </section>
-              {error !== null ? (
-                <p className="text-sm text-destructive-foreground">{error}</p>
-              ) : null}
+              </form>
             </DialogPanel>
             <DialogFooter>
               <Button
@@ -156,11 +161,16 @@ export function PairingDialog() {
               >
                 Cancel
               </Button>
-              <Button size="xs" type="submit" disabled={createMutation.isPending || !canSubmit}>
+              <Button
+                form={formId}
+                size="xs"
+                type="submit"
+                disabled={createMutation.isPending || !canSubmit}
+              >
                 {createMutation.isPending ? "Creating..." : "Create link"}
               </Button>
             </DialogFooter>
-          </form>
+          </>
         ) : (
           <>
             <DialogPanel className={isShowingQrResult ? "p-4 sm:p-5" : "space-y-4"}>

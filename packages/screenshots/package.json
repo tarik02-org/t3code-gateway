@@ -1,0 +1,22 @@
+{
+  "name": "@t3code-gateway/screenshots",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsgo --noEmit",
+    "capture": "node src/main.ts",
+    "install:chromium": "effect-playwright install chromium",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@t3code-gateway/contracts": "workspace:*",
+    "effect": "catalog:",
+    "effect-playwright": "file:vendor/effect-playwright-0.5.0-pr19-f0eb2bbe.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
