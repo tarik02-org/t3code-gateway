@@ -3,9 +3,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 const databaseName = "t3code:connection-runtime";
-const databaseVersion = 2;
+const databaseVersion = 4;
 const storeName = "catalog";
-const requiredStoreNames = ["catalog", "shell", "thread"] as const;
+const requiredStoreNames = ["catalog", "shell", "thread", "server-config", "vcs-refs"] as const;
 const documentKey = "document";
 const gatewayPrefix = "gateway:";
 
