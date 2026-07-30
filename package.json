@@ -33,6 +33,7 @@
     "screenshots": "pnpm --filter @t3code-gateway/screenshots capture",
     "screenshots:install": "pnpm --filter @t3code-gateway/screenshots install:chromium",
     "changeset": "changeset",
+    "changeset:publish": "changeset git-tag",
     "changeset:version": "changeset version && node packaging/scripts/sync-root-version.mjs",
     "typecheck": "vp run -r typecheck",
     "tc": "vp run -r typecheck",

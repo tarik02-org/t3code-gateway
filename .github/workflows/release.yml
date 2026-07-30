@@ -2,8 +2,8 @@ name: release
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - "@t3code-gateway/server@*"
 
 permissions:
   contents: read
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   container:
-    if: ${{ github.repository == 'tarik02-org/t3code-gateway' && contains(github.event.head_commit.message, 'version packages') }}
+    if: ${{ github.repository == 'tarik02-org/t3code-gateway' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -40,8 +40,11 @@ jobs:
       - run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
 
       - id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          version="$(jq -r '.version' packages/contracts/package.json)"
+          version="$(jq -r '.version' packages/server/package.json)"
+          test "${RELEASE_TAG}" = "@t3code-gateway/server@${version}"
           echo "version=${version}" >>"${GITHUB_OUTPUT}"
 
       - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
