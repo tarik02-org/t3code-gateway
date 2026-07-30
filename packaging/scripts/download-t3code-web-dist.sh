@@ -14,7 +14,7 @@ dist_dir="${runtime_dir}/t3code-web-dist"
 rm -rf "${archive_path}" "${extract_tmp}" "${dist_dir}"
 mkdir -p "${extract_tmp}"
 
-curl -fsSL "https://github.com/tarik02/t3code/releases/download/${release_tag}/${asset_name}" -o "${archive_path}"
+curl -fsSL "https://github.com/tarik02-org/t3code/releases/download/${release_tag}/${asset_name}" -o "${archive_path}"
 printf "%s  %s\n" "${asset_sha256}" "${archive_path}" | sha256sum -c -
 if command -v unzip >/dev/null 2>&1; then
   unzip -q "${archive_path}" -d "${extract_tmp}"
