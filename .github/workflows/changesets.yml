@@ -42,12 +42,27 @@ jobs:
       - run: pnpm install --frozen-lockfile --offline
 
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        id: changesets
         with:
           version: pnpm changeset:version
-          publish: pnpm changeset:publish
           title: version packages
           commit: version packages
           commitMode: github-api
-          createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - if: ${{ steps.changesets.outputs.hasChangesets == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          version="$(jq -r '.version' packages/server/package.json)"
+          tag="v${version}"
+
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            git tag "${tag}"
+            git push origin "${tag}"
+          fi
+
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            gh release create "${tag}" --verify-tag --title "${tag}" --generate-notes
+          fi
