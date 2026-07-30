@@ -1,5 +1,12 @@
 # @t3code-gateway/server
 
+## 0.1.1
+
+### Patch Changes
+
+- 4dcacee: publish releases and container images from version tags
+  - @t3code-gateway/contracts@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
