@@ -1,16 +1,20 @@
-name: ci
+name: build
 
 on:
   pull_request:
   push:
     branches:
       - master
+    tags:
+      - "v*"
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
-  check:
+  build:
+    if: ${{ github.repository == 'tarik02-org/t3code-gateway' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -26,6 +30,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
       - run: pnpm fetch --frozen-lockfile --prefer-offline
 
       - run: pnpm install --frozen-lockfile --offline
@@ -37,3 +44,32 @@ jobs:
       - run: pnpm lint
 
       - run: pnpm build
+
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: pnpm download:t3code-web
+
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
+
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: echo "version=${RELEASE_TAG#v}" >>"${GITHUB_OUTPUT}"
+
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+        with:
+          files: docker-bake.hcl
+          source: .
+          push: true
