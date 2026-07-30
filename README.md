@@ -31,7 +31,7 @@ See [the screenshot package](packages/screenshots/README.md) to regenerate them.
 
 ## Run
 
-Images are published to `ghcr.io/tarik02/t3code-gateway`.
+Images are published to `ghcr.io/tarik02-org/t3code-gateway`.
 
 ```sh
 docker run \
@@ -40,7 +40,7 @@ docker run \
   -p 8787:8787 \
   -v t3code-gateway-data:/data \
   -e T3_GATEWAY_PUBLIC_BASE_DOMAIN=code.example.com \
-  ghcr.io/tarik02/t3code-gateway:<version>
+  ghcr.io/tarik02-org/t3code-gateway:<version>
 ```
 
 Open `/admin/login`. On first start, the gateway logs the generated password for the `admin` user.
