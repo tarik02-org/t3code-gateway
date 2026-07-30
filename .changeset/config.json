@@ -2,7 +2,14 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [["@t3code-gateway/contracts", "@t3code-gateway/server", "@t3code-gateway/web"]],
+  "fixed": [
+    [
+      "@t3code-gateway/contracts",
+      "@t3code-gateway/screenshots",
+      "@t3code-gateway/server",
+      "@t3code-gateway/web"
+    ]
+  ],
   "linked": [],
   "access": "restricted",
   "baseBranch": "master",
