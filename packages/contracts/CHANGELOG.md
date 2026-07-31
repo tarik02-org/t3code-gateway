@@ -1,5 +1,11 @@
 # @t3code-gateway/contracts
 
+## 0.1.2
+
+### Patch Changes
+
+- 5f81b11: Update the bundled T3 Code web dist to the latest nightly.
+
 ## 0.1.1
 
 ## 0.1.0
