@@ -2,10 +2,10 @@
 set -eu
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-version="2026.7.101-nightly.20260727.367"
+version="2026.7.2901-nightly.20260730.390"
 release_tag="v${version}"
 asset_name="T3-Code-Web-${version}.zip"
-asset_sha256="273262a15ae4c89ed54f4f20d87a076d9f0c30b56808de5fd182be914c4f0072"
+asset_sha256="82cd4a3bdfcf466cfa2bcb156d6598221eb5a646d110d7bc8fbf26266fb9aff0"
 runtime_dir="${root_dir}/packaging/runtime"
 archive_path="${runtime_dir}/${asset_name}"
 extract_tmp="${runtime_dir}/.t3code-web-dist"
