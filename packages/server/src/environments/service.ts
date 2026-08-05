@@ -27,6 +27,7 @@ import {
   encodeStringArrayJson,
   encodeUnknownJson,
 } from "./json-codecs.ts";
+import { isDnsSafeSlug } from "./slug.ts";
 import { validateEnvironmentInput } from "./validation.ts";
 import { computePublicUrls } from "./urls.ts";
 import {
@@ -169,8 +170,8 @@ export const make = Effect.gen(function* () {
       }
 
       const needsRevalidation =
-        input.slug !== undefined ||
-        input.endpoint !== undefined ||
+        (input.endpoint !== undefined && input.endpoint !== existing.endpoint) ||
+        input.pairingCode !== undefined ||
         input.adminBearerToken !== undefined;
 
       let nextValues: {
@@ -199,7 +200,11 @@ export const make = Effect.gen(function* () {
             slug: input.slug ?? existing.slug,
             label: input.label ?? existing.label,
             endpoint: input.endpoint ?? existing.endpoint,
-            adminBearerToken: input.adminBearerToken ?? decryptedToken,
+            ...(input.adminBearerToken !== undefined
+              ? { adminBearerToken: input.adminBearerToken }
+              : input.pairingCode !== undefined
+                ? { pairingCode: input.pairingCode }
+                : { adminBearerToken: decryptedToken }),
             browserTokenScopes:
               input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
           },
@@ -231,9 +236,30 @@ export const make = Effect.gen(function* () {
           enabled: input.enabled ?? existing.enabled,
         };
       } else {
+        const slug = input.slug ?? existing.slug;
+        const label = input.label ?? existing.label;
+
+        if (!isDnsSafeSlug(slug)) {
+          return yield* new EnvironmentFailure({
+            message:
+              "Slug must be DNS-safe: lowercase letters, digits, and hyphens, starting with a letter",
+          });
+        }
+
+        if (label.length === 0) {
+          return yield* new EnvironmentFailure({ message: "Label is required" });
+        }
+
+        if (slug !== existing.slug) {
+          const slugConflict = yield* environmentRepository.findEnvironmentIdBySlug(slug);
+          if (slugConflict !== undefined && slugConflict !== environmentId) {
+            return yield* new EnvironmentFailure({ message: `Slug "${slug}" is already in use` });
+          }
+        }
+
         nextValues = {
-          slug: existing.slug,
-          label: input.label ?? existing.label,
+          slug,
+          label,
           endpoint: existing.endpoint,
           descriptorJson: existing.descriptorJson ?? encodeUnknownJson(null),
           browserTokenScopesJson: encodeStringArrayJson(

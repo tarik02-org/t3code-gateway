@@ -7,6 +7,7 @@ interface EditEnvironmentDialogState {
   readonly label: string;
   readonly slug: string;
   readonly endpoint: string;
+  readonly pairingCode: string;
   readonly enabled: boolean;
   readonly error: string | null;
   readonly openFor: (environment: EnvironmentRecord) => void;
@@ -14,6 +15,7 @@ interface EditEnvironmentDialogState {
   readonly setLabel: (label: string) => void;
   readonly setSlug: (slug: string) => void;
   readonly setEndpoint: (endpoint: string) => void;
+  readonly setPairingCode: (pairingCode: string) => void;
   readonly setEnabled: (enabled: boolean) => void;
   readonly setError: (error: string | null) => void;
   readonly reset: () => void;
@@ -25,6 +27,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
   label: "",
   slug: "",
   endpoint: "",
+  pairingCode: "",
   enabled: true,
   error: null,
   openFor: (environment) =>
@@ -34,6 +37,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
       label: environment.label,
       slug: environment.slug,
       endpoint: environment.endpoint,
+      pairingCode: "",
       enabled: environment.enabled,
       error: null,
     }),
@@ -41,6 +45,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
   setLabel: (label) => set({ label }),
   setSlug: (slug) => set({ slug }),
   setEndpoint: (endpoint) => set({ endpoint }),
+  setPairingCode: (pairingCode) => set({ pairingCode }),
   setEnabled: (enabled) => set({ enabled }),
   setError: (error) => set({ error }),
   reset: () =>
@@ -50,6 +55,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
       label: "",
       slug: "",
       endpoint: "",
+      pairingCode: "",
       enabled: true,
       error: null,
     }),

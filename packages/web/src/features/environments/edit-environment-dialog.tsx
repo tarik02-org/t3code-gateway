@@ -23,12 +23,14 @@ export function EditEnvironmentDialog() {
   const label = useEditEnvironmentDialogStore((state) => state.label);
   const slug = useEditEnvironmentDialogStore((state) => state.slug);
   const endpoint = useEditEnvironmentDialogStore((state) => state.endpoint);
+  const pairingCode = useEditEnvironmentDialogStore((state) => state.pairingCode);
   const enabled = useEditEnvironmentDialogStore((state) => state.enabled);
   const error = useEditEnvironmentDialogStore((state) => state.error);
   const setOpen = useEditEnvironmentDialogStore((state) => state.setOpen);
   const setLabel = useEditEnvironmentDialogStore((state) => state.setLabel);
   const setSlug = useEditEnvironmentDialogStore((state) => state.setSlug);
   const setEndpoint = useEditEnvironmentDialogStore((state) => state.setEndpoint);
+  const setPairingCode = useEditEnvironmentDialogStore((state) => state.setPairingCode);
   const setEnabled = useEditEnvironmentDialogStore((state) => state.setEnabled);
   const setError = useEditEnvironmentDialogStore((state) => state.setError);
   const reset = useEditEnvironmentDialogStore((state) => state.reset);
@@ -74,7 +76,13 @@ export function EditEnvironmentDialog() {
               if (!canSubmit) {
                 return;
               }
-              updateMutation.mutate({ slug, label, endpoint, enabled });
+              updateMutation.mutate({
+                slug,
+                label,
+                endpoint,
+                enabled,
+                ...(pairingCode.length > 0 ? { pairingCode } : {}),
+              });
             }}
           >
             <div className="flex flex-col gap-4">
@@ -85,6 +93,12 @@ export function EditEnvironmentDialog() {
                 value={endpoint}
                 onChange={setEndpoint}
                 placeholder="https://backend.example.com"
+              />
+              <Field
+                label="Pairing code"
+                value={pairingCode}
+                onChange={setPairingCode}
+                placeholder="Leave blank to keep current credentials"
               />
               <label className="flex items-center justify-between gap-3 text-sm">
                 <span>Enabled</span>

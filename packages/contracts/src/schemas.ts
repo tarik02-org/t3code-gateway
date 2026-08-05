@@ -111,6 +111,7 @@ export const UpdateEnvironmentRequest = Schema.Struct({
   slug: Schema.optional(Schema.String),
   label: Schema.optional(Schema.String),
   endpoint: Schema.optional(Schema.String),
+  pairingCode: Schema.optional(Schema.String),
   adminBearerToken: Schema.optional(Schema.String),
   browserTokenScopes: Schema.optional(Schema.Array(Schema.String)),
   enabled: Schema.optional(Schema.Boolean),
