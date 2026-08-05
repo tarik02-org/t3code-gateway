@@ -171,7 +171,7 @@ export const make = Effect.gen(function* () {
 
       const needsRevalidation =
         (input.endpoint !== undefined && input.endpoint !== existing.endpoint) ||
-        input.pairingCode !== undefined ||
+        (input.pairingCode !== undefined && input.pairingCode.length > 0) ||
         input.adminBearerToken !== undefined;
 
       let nextValues: {
@@ -202,7 +202,7 @@ export const make = Effect.gen(function* () {
             endpoint: input.endpoint ?? existing.endpoint,
             ...(input.adminBearerToken !== undefined
               ? { adminBearerToken: input.adminBearerToken }
-              : input.pairingCode !== undefined
+              : input.pairingCode !== undefined && input.pairingCode.length > 0
                 ? { pairingCode: input.pairingCode }
                 : { adminBearerToken: decryptedToken }),
             browserTokenScopes:
