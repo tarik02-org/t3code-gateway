@@ -1,5 +1,11 @@
 # @t3code-gateway/contracts
 
+## 0.1.3
+
+### Patch Changes
+
+- 8bf770b: Allow environment edits without reconnecting when the endpoint is unchanged, and support replacing pairing credentials from the edit form.
+
 ## 0.1.2
 
 ### Patch Changes
