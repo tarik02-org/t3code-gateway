@@ -15,7 +15,13 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
 import { DatabaseError } from "../db/errors.ts";
-import { ADMIN_TOKEN_ROTATION_WINDOW_MS, ADMIN_TOKEN_SCOPES } from "./constants.ts";
+import {
+  ADMIN_TOKEN_ROTATION_WINDOW_MS,
+  ADMIN_TOKEN_SCOPES,
+  ADMIN_TOKEN_SWEEP_CONCURRENCY,
+  ADMIN_TOKEN_SWEEP_INTERVAL,
+  ADMIN_TOKEN_SWEEP_TIMEOUT,
+} from "./constants.ts";
 import {
   createPairingCredential,
   exchangePairingCodeForBearerAccessToken,
@@ -197,6 +203,18 @@ export const makeAdminTokenRotation = Effect.fn("makeAdminTokenRotation")(functi
         return token;
       }
     }
+    const lastAttemptAt =
+      row.adminTokenLastCheckedAt === null
+        ? null
+        : Option.getOrNull(DateTime.make(row.adminTokenLastCheckedAt));
+    if (
+      failure !== null &&
+      failure["_tag"] === "Retrying" &&
+      lastAttemptAt !== null &&
+      DateTime.isLessThan(now, DateTime.addDuration(lastAttemptAt, ADMIN_TOKEN_SWEEP_INTERVAL))
+    ) {
+      return token;
+    }
 
     const attempt = Effect.gen(function* () {
       const currentSession = yield* validateAdminBearerToken(client, row.endpoint, token).pipe(
@@ -349,6 +367,7 @@ export const makeAdminTokenRotation = Effect.fn("makeAdminTokenRotation")(functi
         rows.filter((row) => row.enabled),
         (row) =>
           ensureFresh(row.environmentId).pipe(
+            Effect.timeout(ADMIN_TOKEN_SWEEP_TIMEOUT),
             Effect.asVoid,
             Effect.catchTags({
               DatabaseError: (error) =>
@@ -359,9 +378,30 @@ export const makeAdminTokenRotation = Effect.fn("makeAdminTokenRotation")(functi
                 Effect.logWarning("Environment admin token requires repair").pipe(
                   Effect.annotateLogs({ environmentId: row.environmentId, reason: error.message }),
                 ),
+              TimeoutError: () =>
+                Effect.gen(function* () {
+                  const attemptedAt = DateTime.formatIso(yield* DateTime.now);
+                  yield* recordFailure(
+                    row,
+                    { _tag: "Retrying", message: "Admin token maintenance timed out" },
+                    attemptedAt,
+                  ).pipe(
+                    Effect.catchTag("DatabaseError", (error) =>
+                      Effect.logError("Could not record environment admin token timeout").pipe(
+                        Effect.annotateLogs({
+                          environmentId: row.environmentId,
+                          reason: error.message,
+                        }),
+                      ),
+                    ),
+                  );
+                  yield* Effect.logWarning("Environment admin token sweep timed out").pipe(
+                    Effect.annotateLogs({ environmentId: row.environmentId }),
+                  );
+                }),
             }),
           ),
-        { discard: true },
+        { concurrency: ADMIN_TOKEN_SWEEP_CONCURRENCY, discard: true },
       ),
     ),
     Effect.catchTag("DatabaseError", (error) =>
