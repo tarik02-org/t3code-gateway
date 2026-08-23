@@ -19,11 +19,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { GatewayRuntimeConfig } from "../config.ts";
-import {
-  EnvironmentRepository,
-  type EnvironmentRow,
-  type UpdateEnvironmentInput as EnvironmentRepositoryUpdateInput,
-} from "../db/environment-repository.ts";
+import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
 import { DatabaseError } from "../db/errors.ts";
 import { AdminTokenRotation, adminTokenStatus } from "./admin-token-rotation.ts";
 import {
@@ -189,102 +185,129 @@ export const make = Effect.gen(function* () {
         (input.pairingCode !== undefined && input.pairingCode.length > 0) ||
         input.adminBearerToken !== undefined;
 
-      const timestamp = DateTime.formatIso(yield* DateTime.now);
-      let nextValues: EnvironmentRepositoryUpdateInput;
-
       if (needsRevalidation) {
-        const decryptedToken = yield* secrets.decrypt(existing.adminTokenEncrypted).pipe(
-          Effect.catchTags({
-            SecretEncryptionError: (error) =>
-              Effect.fail(
-                new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
+        let current = existing;
+        let providedAdminBearerToken = input.adminBearerToken ?? null;
+
+        while (true) {
+          let adminCredential:
+            | { readonly adminBearerToken: string }
+            | { readonly pairingCode: string };
+          if (providedAdminBearerToken !== null) {
+            adminCredential = { adminBearerToken: providedAdminBearerToken };
+          } else if (input.pairingCode !== undefined && input.pairingCode.length > 0) {
+            adminCredential = { pairingCode: input.pairingCode };
+          } else {
+            adminCredential = {
+              adminBearerToken: yield* secrets.decrypt(current.adminTokenEncrypted).pipe(
+                Effect.catchTags({
+                  SecretEncryptionError: (error) =>
+                    Effect.fail(
+                      new DatabaseError({
+                        operation: "environment",
+                        reason: "unknown",
+                        cause: error,
+                      }),
+                    ),
+                }),
               ),
-          }),
-        );
-
-        const validated = yield* validateEnvironmentInput(
-          validationContext,
-          {
-            slug: input.slug ?? existing.slug,
-            label: input.label ?? existing.label,
-            endpoint: input.endpoint ?? existing.endpoint,
-            ...(input.adminBearerToken !== undefined
-              ? { adminBearerToken: input.adminBearerToken }
-              : input.pairingCode !== undefined && input.pairingCode.length > 0
-                ? { pairingCode: input.pairingCode }
-                : { adminBearerToken: decryptedToken }),
-            browserTokenScopes:
-              input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
-          },
-          { excludeEnvironmentId: environmentId },
-        );
-
-        if (validated.environmentId !== environmentId) {
-          return yield* new EnvironmentFailure({
-            message: "Environment descriptor ID does not match the registered environment",
-          });
-        }
-
-        const encryptedToken = yield* secrets.encrypt(validated.adminBearerToken).pipe(
-          Effect.catchTags({
-            SecretEncryptionError: (error) =>
-              Effect.fail(
-                new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
-              ),
-          }),
-        );
-
-        nextValues = {
-          _tag: "ReplaceAdminToken",
-          slug: validated.slug,
-          label: validated.label,
-          endpoint: validated.endpoint,
-          descriptorJson: encodeUnknownJson(validated.descriptor),
-          browserTokenScopesJson: encodeStringArrayJson(validated.browserTokenScopes),
-          adminTokenEncrypted: encryptedToken,
-          adminTokenExpiresAt: validated.adminTokenExpiresAt,
-          adminTokenLastCheckedAt: validated.adminTokenLastCheckedAt,
-          adminTokenFailureJson: null,
-          enabled: input.enabled ?? existing.enabled,
-          updatedAt: timestamp,
-        };
-      } else {
-        const slug = input.slug ?? existing.slug;
-        const label = input.label ?? existing.label;
-
-        if (!isDnsSafeSlug(slug)) {
-          return yield* new EnvironmentFailure({
-            message:
-              "Slug must be DNS-safe: lowercase letters, digits, and hyphens, starting with a letter",
-          });
-        }
-
-        if (label.length === 0) {
-          return yield* new EnvironmentFailure({ message: "Label is required" });
-        }
-
-        if (slug !== existing.slug) {
-          const slugConflict = yield* environmentRepository.findEnvironmentIdBySlug(slug);
-          if (slugConflict !== undefined && slugConflict !== environmentId) {
-            return yield* new EnvironmentFailure({ message: `Slug "${slug}" is already in use` });
+            };
           }
-        }
 
-        nextValues = {
-          _tag: "KeepAdminToken",
-          slug,
-          label,
-          endpoint: existing.endpoint,
-          descriptorJson: existing.descriptorJson ?? encodeUnknownJson(null),
-          browserTokenScopesJson: encodeStringArrayJson(
-            input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
-          ),
-          enabled: input.enabled ?? existing.enabled,
-          updatedAt: timestamp,
-        };
+          const validated = yield* validateEnvironmentInput(
+            validationContext,
+            {
+              slug: input.slug ?? current.slug,
+              label: input.label ?? current.label,
+              endpoint: input.endpoint ?? current.endpoint,
+              ...adminCredential,
+              browserTokenScopes:
+                input.browserTokenScopes ?? decodeStringArrayJson(current.browserTokenScopesJson),
+            },
+            { excludeEnvironmentId: environmentId },
+          );
+
+          if (validated.environmentId !== environmentId) {
+            return yield* new EnvironmentFailure({
+              message: "Environment descriptor ID does not match the registered environment",
+            });
+          }
+
+          if (
+            input.adminBearerToken !== undefined ||
+            (input.pairingCode !== undefined && input.pairingCode.length > 0)
+          ) {
+            providedAdminBearerToken = validated.adminBearerToken;
+          }
+
+          const encryptedToken = yield* secrets.encrypt(validated.adminBearerToken).pipe(
+            Effect.catchTags({
+              SecretEncryptionError: (error) =>
+                Effect.fail(
+                  new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
+                ),
+            }),
+          );
+          const updated = yield* environmentRepository.updateEnvironment(environmentId, {
+            _tag: "ReplaceAdminToken",
+            slug: validated.slug,
+            label: validated.label,
+            endpoint: validated.endpoint,
+            descriptorJson: encodeUnknownJson(validated.descriptor),
+            browserTokenScopesJson: encodeStringArrayJson(validated.browserTokenScopes),
+            currentTokenEncrypted: current.adminTokenEncrypted,
+            adminTokenEncrypted: encryptedToken,
+            adminTokenExpiresAt: validated.adminTokenExpiresAt,
+            adminTokenLastCheckedAt: validated.adminTokenLastCheckedAt,
+            adminTokenFailureJson: null,
+            enabled: input.enabled ?? current.enabled,
+            updatedAt: DateTime.formatIso(yield* DateTime.now),
+          });
+          if (updated) {
+            return yield* get(environmentId);
+          }
+
+          const latest = yield* environmentRepository.findEnvironment(environmentId);
+          if (latest === undefined) {
+            return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
+          }
+          current = latest;
+        }
       }
 
-      yield* environmentRepository.updateEnvironment(environmentId, nextValues);
+      const slug = input.slug ?? existing.slug;
+      const label = input.label ?? existing.label;
+
+      if (!isDnsSafeSlug(slug)) {
+        return yield* new EnvironmentFailure({
+          message:
+            "Slug must be DNS-safe: lowercase letters, digits, and hyphens, starting with a letter",
+        });
+      }
+
+      if (label.length === 0) {
+        return yield* new EnvironmentFailure({ message: "Label is required" });
+      }
+
+      if (slug !== existing.slug) {
+        const slugConflict = yield* environmentRepository.findEnvironmentIdBySlug(slug);
+        if (slugConflict !== undefined && slugConflict !== environmentId) {
+          return yield* new EnvironmentFailure({ message: `Slug "${slug}" is already in use` });
+        }
+      }
+
+      yield* environmentRepository.updateEnvironment(environmentId, {
+        _tag: "KeepAdminToken",
+        slug,
+        label,
+        endpoint: existing.endpoint,
+        descriptorJson: existing.descriptorJson ?? encodeUnknownJson(null),
+        browserTokenScopesJson: encodeStringArrayJson(
+          input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
+        ),
+        enabled: input.enabled ?? existing.enabled,
+        updatedAt: DateTime.formatIso(yield* DateTime.now),
+      });
 
       return yield* get(environmentId);
     });

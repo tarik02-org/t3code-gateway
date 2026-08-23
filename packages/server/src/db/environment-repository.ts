@@ -53,6 +53,7 @@ export type UpdateEnvironmentInput =
   | (UpdateEnvironmentFields & { readonly _tag: "KeepAdminToken" })
   | (UpdateEnvironmentFields & {
       readonly _tag: "ReplaceAdminToken";
+      readonly currentTokenEncrypted: Buffer;
       readonly adminTokenEncrypted: Buffer;
       readonly adminTokenExpiresAt: string | null;
       readonly adminTokenLastCheckedAt: string | null;
@@ -83,7 +84,7 @@ export class EnvironmentRepository extends Context.Service<
     readonly updateEnvironment: (
       environmentId: string,
       input: UpdateEnvironmentInput,
-    ) => Effect.Effect<void, DatabaseError>;
+    ) => Effect.Effect<boolean, DatabaseError>;
     readonly updateEnvironmentAdminTokenState: (
       environmentId: string,
       input: UpdateEnvironmentAdminTokenStateInput,
@@ -162,10 +163,17 @@ export const make = Effect.gen(function* () {
               updatedAt: input.updatedAt,
             },
       )
-      .where(eq(environments.environmentId, environmentId))
+      .where(
+        input["_tag"] === "KeepAdminToken"
+          ? eq(environments.environmentId, environmentId)
+          : and(
+              eq(environments.environmentId, environmentId),
+              eq(environments.adminTokenEncrypted, input.currentTokenEncrypted),
+            ),
+      )
       .run()
       .pipe(
-        Effect.asVoid,
+        Effect.map((result) => result.changes > 0),
         Effect.catchTags({ EffectDrizzleQueryError: (error) => queryError("environment", error) }),
       );
 
