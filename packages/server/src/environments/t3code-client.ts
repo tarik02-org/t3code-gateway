@@ -3,6 +3,7 @@ import type {
   RevokeEnvironmentClientResponse,
 } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpBody from "effect/unstable/http/HttpBody";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
@@ -40,7 +41,7 @@ const T3ClientSession = Schema.Struct({
     browser: Schema.optional(Schema.String),
   }),
   issuedAt: Schema.String,
-  expiresAt: Schema.String,
+  expiresAt: Schema.DateTimeUtcFromString,
   lastConnectedAt: Schema.NullOr(Schema.String),
   connected: Schema.Boolean,
   current: Schema.Boolean,
@@ -340,7 +341,7 @@ const mapClientSession = (session: typeof T3ClientSession.Type): EnvironmentClie
   method: session.method,
   client: session.client,
   issuedAt: session.issuedAt,
-  expiresAt: session.expiresAt,
+  expiresAt: DateTime.formatIso(session.expiresAt),
   lastConnectedAt: session.lastConnectedAt,
   connected: session.connected,
   current: session.current,

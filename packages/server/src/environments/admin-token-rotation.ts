@@ -216,10 +216,38 @@ export const makeAdminTokenRotation = Effect.fn("makeAdminTokenRotation")(functi
       return token;
     }
 
+    const currentSession = yield* validateAdminBearerToken(client, row.endpoint, token).pipe(
+      Effect.flatMap(adminSessionWithRequiredScopes),
+      Effect.catchTag("EnvironmentFailure", (error) =>
+        Effect.gen(function* () {
+          const attemptedAt = DateTime.formatIso(yield* DateTime.now);
+          const repairRequired = error.status === 401 || error.status === 403;
+          yield* recordFailure(
+            row,
+            repairRequired
+              ? { _tag: "RepairRequired", message: error.message }
+              : { _tag: "Retrying", message: error.message },
+            attemptedAt,
+          );
+          yield* Effect.logWarning("Environment admin token validation failed").pipe(
+            Effect.annotateLogs({
+              environmentId: row.environmentId,
+              repairRequired,
+              reason: error.message,
+            }),
+          );
+          if (repairRequired) {
+            return yield* error;
+          }
+          return null;
+        }),
+      ),
+    );
+    if (currentSession === null) {
+      return token;
+    }
+
     const attempt = Effect.gen(function* () {
-      const currentSession = yield* validateAdminBearerToken(client, row.endpoint, token).pipe(
-        Effect.flatMap(adminSessionWithRequiredScopes),
-      );
       const observedAt = yield* DateTime.now;
       const observedExpiry = Option.getOrNull(DateTime.make(currentSession.expiresAt));
       if (observedExpiry === null) {
@@ -328,24 +356,13 @@ export const makeAdminTokenRotation = Effect.fn("makeAdminTokenRotation")(functi
       Effect.catchTag("EnvironmentFailure", (error) =>
         Effect.gen(function* () {
           const attemptedAt = DateTime.formatIso(yield* DateTime.now);
-          const repairRequired = error.status === 401 || error.status === 403;
-          yield* recordFailure(
-            row,
-            repairRequired
-              ? { _tag: "RepairRequired", message: error.message }
-              : { _tag: "Retrying", message: error.message },
-            attemptedAt,
-          );
-          yield* Effect.logWarning("Environment admin token maintenance failed").pipe(
+          yield* recordFailure(row, { _tag: "Retrying", message: error.message }, attemptedAt);
+          yield* Effect.logWarning("Environment admin token replacement failed").pipe(
             Effect.annotateLogs({
               environmentId: row.environmentId,
-              repairRequired,
               reason: error.message,
             }),
           );
-          if (repairRequired) {
-            return yield* error;
-          }
           return token;
         }),
       ),
