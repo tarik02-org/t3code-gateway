@@ -1,9 +1,10 @@
 import type { EnvironmentRecord } from "@t3code-gateway/contracts/schemas";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog } from "../../components/confirm-dialog.tsx";
 import { CopyButton } from "../../components/copy-button.tsx";
+import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input } from "../../components/ui/input.tsx";
 import { Label } from "../../components/ui/label.tsx";
@@ -11,6 +12,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../../components/ui/popov
 import { Skeleton } from "../../components/ui/skeleton.tsx";
 import { Switch } from "../../components/ui/switch.tsx";
 import { toastManager } from "../../components/ui/toast.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip.tsx";
 import {
   createT3CodeCatalogEntry,
   deleteEnvironment,
@@ -47,7 +49,7 @@ export function EnvironmentTable({
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
+          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -56,6 +58,7 @@ export function EnvironmentTable({
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
+            <th className="px-2 py-3 text-center font-medium">Admin token</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -87,6 +90,9 @@ export function EnvironmentTable({
                 </div>
               </td>
               <td className="px-2 py-3 text-center">
+                <AdminTokenStatusBadge environment={environment} />
+              </td>
+              <td className="px-2 py-3 text-center">
                 <EnvironmentEnabledSwitch environment={environment} />
               </td>
               {showWebColumn ? (
@@ -113,6 +119,103 @@ export function EnvironmentTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+
+function AdminTokenStatusBadge({
+  environment,
+}: Readonly<{
+  environment: EnvironmentRecord;
+}>) {
+  const status = environment.adminTokenStatus;
+  let label: string;
+  let variant: "default" | "destructive" | "ghost" | "outline" | "secondary";
+  let details: ReactNode;
+
+  switch (status["_tag"]) {
+    case "Unknown":
+      label = "Checking";
+      variant = "outline";
+      details = "Token expiry has not been checked yet.";
+      break;
+    case "Healthy":
+      label = "Healthy";
+      variant = "secondary";
+      details = (
+        <div className="flex flex-col gap-1">
+          <p>Expires: {formatDate(status.expiresAt)}</p>
+          <p>
+            Last checked:{" "}
+            {status.lastCheckedAt === null ? "Not recorded" : formatDate(status.lastCheckedAt)}
+          </p>
+        </div>
+      );
+      break;
+    case "RotationDue":
+      label = "Rotation due";
+      variant = "default";
+      details = (
+        <div className="flex flex-col gap-1">
+          <p>Rotation is due before {formatDate(status.expiresAt)}.</p>
+          <p>
+            Last checked:{" "}
+            {status.lastCheckedAt === null ? "Not recorded" : formatDate(status.lastCheckedAt)}
+          </p>
+        </div>
+      );
+      break;
+    case "Retrying":
+      label = "Retrying";
+      variant = "outline";
+      details = (
+        <div className="flex flex-col gap-1">
+          <p>Expires: {status.expiresAt === null ? "Unknown" : formatDate(status.expiresAt)}</p>
+          <p>Last attempt: {formatDate(status.lastAttemptAt)}</p>
+          <p>{status.message}</p>
+        </div>
+      );
+      break;
+    case "RepairRequired":
+      label = "Re-pair required";
+      variant = "destructive";
+      details = (
+        <div className="flex flex-col gap-1">
+          <p>Expires: {status.expiresAt === null ? "Unknown" : formatDate(status.expiresAt)}</p>
+          <p>Last attempt: {formatDate(status.lastAttemptAt)}</p>
+          <p>{status.message}</p>
+        </div>
+      );
+      break;
+    case "Paused":
+      label = "Paused";
+      variant = "ghost";
+      details = (
+        <div className="flex flex-col gap-1">
+          <p>Maintenance is paused while this environment is disabled.</p>
+          <p>Expires: {status.expiresAt === null ? "Unknown" : formatDate(status.expiresAt)}</p>
+          <p>
+            Last checked:{" "}
+            {status.lastCheckedAt === null ? "Not recorded" : formatDate(status.lastCheckedAt)}
+          </p>
+          {status.lastFailure === null ? null : <p>{status.lastFailure}</p>}
+        </div>
+      );
+      break;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{details}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -206,7 +309,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
+          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -215,6 +318,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
             <th className="px-4 py-3 font-medium">Label</th>
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
+            <th className="px-2 py-3 text-center font-medium">Admin token</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -231,6 +335,9 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
               </td>
               <td className="px-4 py-3">
                 <Skeleton className="h-4 w-64 max-w-full rounded-full" />
+              </td>
+              <td className="px-2 py-3">
+                <Skeleton className="mx-auto h-5 w-20 rounded-full" />
               </td>
               <td className="px-2 py-3">
                 <Skeleton className="mx-auto h-5 w-9 rounded-full" />
@@ -262,6 +369,7 @@ function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: bo
       <col className="w-[16%]" />
       <col className="w-[13%]" />
       <col />
+      <col className="w-32" />
       <col className="w-18" />
       {showWebColumn ? <col className="w-16" /> : null}
       <col className="w-64" />

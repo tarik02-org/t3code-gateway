@@ -28,6 +28,9 @@ export const environments = sqliteTable("environments", {
   descriptorJson: text("descriptor_json"),
   browserTokenScopesJson: text("browser_token_scopes_json").notNull(),
   adminTokenEncrypted: blob("admin_token_encrypted", { mode: "buffer" }).notNull(),
+  adminTokenExpiresAt: text("admin_token_expires_at"),
+  adminTokenLastCheckedAt: text("admin_token_last_checked_at"),
+  adminTokenFailureJson: text("admin_token_failure_json"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

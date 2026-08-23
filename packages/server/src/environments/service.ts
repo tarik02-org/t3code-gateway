@@ -19,8 +19,13 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { GatewayRuntimeConfig } from "../config.ts";
-import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
+import {
+  EnvironmentRepository,
+  type EnvironmentRow,
+  type UpdateEnvironmentInput as EnvironmentRepositoryUpdateInput,
+} from "../db/environment-repository.ts";
 import { DatabaseError } from "../db/errors.ts";
+import { AdminTokenRotation, adminTokenStatus } from "./admin-token-rotation.ts";
 import {
   decodeStringArrayJson,
   decodeUnknownJson,
@@ -79,7 +84,11 @@ export class EnvironmentService extends Context.Service<
   }
 >()("@t3code-gateway/server/environments/service/EnvironmentService") {}
 
-const rowToRecord = (row: EnvironmentRow, publicBaseDomain: string): EnvironmentRecord => {
+const rowToRecord = (
+  row: EnvironmentRow,
+  publicBaseDomain: string,
+  now: DateTime.Utc,
+): EnvironmentRecord => {
   const publicUrls = computePublicUrls(row.slug, publicBaseDomain);
   return {
     environmentId: row.environmentId,
@@ -93,6 +102,7 @@ const rowToRecord = (row: EnvironmentRow, publicBaseDomain: string): Environment
         ? undefined
         : decodeUnknownJson(row.descriptorJson),
     browserTokenScopes: decodeStringArrayJson(row.browserTokenScopesJson),
+    adminTokenStatus: adminTokenStatus(row, now),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -111,6 +121,7 @@ const buildPairingUrl = (publicHttpBaseUrl: string, credential: string) => {
 export const make = Effect.gen(function* () {
   const environmentRepository = yield* EnvironmentRepository;
   const secrets = yield* SecretEncryption;
+  const adminTokens = yield* AdminTokenRotation;
   const config = yield* GatewayRuntimeConfig;
   const client = yield* HttpClient.HttpClient;
   const validationContext = { environmentRepository, config, client };
@@ -118,7 +129,8 @@ export const make = Effect.gen(function* () {
   const list = () =>
     Effect.gen(function* () {
       const rows = yield* environmentRepository.listEnvironments;
-      return rows.map((row) => rowToRecord(row, config.publicBaseDomain));
+      const now = yield* DateTime.now;
+      return rows.map((row) => rowToRecord(row, config.publicBaseDomain, now));
     });
 
   const get = (environmentId: string) =>
@@ -129,7 +141,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
-      return rowToRecord(row, config.publicBaseDomain);
+      return rowToRecord(row, config.publicBaseDomain, yield* DateTime.now);
     });
 
   const create = (input: EnvironmentInput) =>
@@ -143,7 +155,7 @@ export const make = Effect.gen(function* () {
             ),
         }),
       );
-      const timestamp = DateTime.formatIso(DateTime.nowUnsafe());
+      const timestamp = DateTime.formatIso(yield* DateTime.now);
 
       yield* environmentRepository.createEnvironment({
         environmentId: validated.environmentId,
@@ -154,6 +166,9 @@ export const make = Effect.gen(function* () {
         descriptorJson: encodeUnknownJson(validated.descriptor),
         browserTokenScopesJson: encodeStringArrayJson(validated.browserTokenScopes),
         adminTokenEncrypted: encryptedToken,
+        adminTokenExpiresAt: validated.adminTokenExpiresAt,
+        adminTokenLastCheckedAt: validated.adminTokenLastCheckedAt,
+        adminTokenFailureJson: null,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
@@ -174,15 +189,8 @@ export const make = Effect.gen(function* () {
         (input.pairingCode !== undefined && input.pairingCode.length > 0) ||
         input.adminBearerToken !== undefined;
 
-      let nextValues: {
-        slug: string;
-        label: string;
-        endpoint: string;
-        descriptorJson: string;
-        browserTokenScopesJson: string;
-        adminTokenEncrypted: Buffer;
-        enabled: boolean;
-      };
+      const timestamp = DateTime.formatIso(yield* DateTime.now);
+      let nextValues: EnvironmentRepositoryUpdateInput;
 
       if (needsRevalidation) {
         const decryptedToken = yield* secrets.decrypt(existing.adminTokenEncrypted).pipe(
@@ -227,13 +235,18 @@ export const make = Effect.gen(function* () {
         );
 
         nextValues = {
+          _tag: "ReplaceAdminToken",
           slug: validated.slug,
           label: validated.label,
           endpoint: validated.endpoint,
           descriptorJson: encodeUnknownJson(validated.descriptor),
           browserTokenScopesJson: encodeStringArrayJson(validated.browserTokenScopes),
           adminTokenEncrypted: encryptedToken,
+          adminTokenExpiresAt: validated.adminTokenExpiresAt,
+          adminTokenLastCheckedAt: validated.adminTokenLastCheckedAt,
+          adminTokenFailureJson: null,
           enabled: input.enabled ?? existing.enabled,
+          updatedAt: timestamp,
         };
       } else {
         const slug = input.slug ?? existing.slug;
@@ -258,6 +271,7 @@ export const make = Effect.gen(function* () {
         }
 
         nextValues = {
+          _tag: "KeepAdminToken",
           slug,
           label,
           endpoint: existing.endpoint,
@@ -265,16 +279,12 @@ export const make = Effect.gen(function* () {
           browserTokenScopesJson: encodeStringArrayJson(
             input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
           ),
-          adminTokenEncrypted: existing.adminTokenEncrypted,
           enabled: input.enabled ?? existing.enabled,
+          updatedAt: timestamp,
         };
       }
 
-      const timestamp = DateTime.formatIso(DateTime.nowUnsafe());
-      yield* environmentRepository.updateEnvironment(environmentId, {
-        ...nextValues,
-        updatedAt: timestamp,
-      });
+      yield* environmentRepository.updateEnvironment(environmentId, nextValues);
 
       return yield* get(environmentId);
     });
@@ -333,14 +343,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
-      const adminBearerToken = yield* secrets.decrypt(row.adminTokenEncrypted).pipe(
-        Effect.catchTags({
-          SecretEncryptionError: (error) =>
-            Effect.fail(
-              new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
-            ),
-        }),
-      );
+      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
       if (adminBearerToken.length === 0) {
         return [];
       }
@@ -369,14 +372,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
-      const adminBearerToken = yield* secrets.decrypt(row.adminTokenEncrypted).pipe(
-        Effect.catchTags({
-          SecretEncryptionError: (error) =>
-            Effect.fail(
-              new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
-            ),
-        }),
-      );
+      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
       if (adminBearerToken.length === 0) {
         return yield* new EnvironmentFailure({ message: "Admin bearer token is required" });
       }
@@ -410,14 +406,7 @@ export const make = Effect.gen(function* () {
       }
 
       const scopes = decodeStringArrayJson(row.browserTokenScopesJson);
-      const adminBearerToken = yield* secrets.decrypt(row.adminTokenEncrypted).pipe(
-        Effect.catchTags({
-          SecretEncryptionError: (error) =>
-            Effect.fail(
-              new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
-            ),
-        }),
-      );
+      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
       if (adminBearerToken.length === 0) {
         return yield* new EnvironmentFailure({ message: "Admin bearer token is required" });
       }
@@ -475,14 +464,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
-      const adminBearerToken = yield* secrets.decrypt(row.adminTokenEncrypted).pipe(
-        Effect.catchTags({
-          SecretEncryptionError: (error) =>
-            Effect.fail(
-              new DatabaseError({ operation: "environment", reason: "unknown", cause: error }),
-            ),
-        }),
-      );
+      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
       if (adminBearerToken.length === 0) {
         return yield* new EnvironmentFailure({ message: "Admin bearer token is required" });
       }

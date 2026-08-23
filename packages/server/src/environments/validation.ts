@@ -1,12 +1,13 @@
 import type { EnvironmentInput } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 
 import type { GatewayConfig } from "../config.ts";
 import { EnvironmentRepository } from "../db/environment-repository.ts";
 import { DatabaseError } from "../db/errors.ts";
-import { DEFAULT_ENVIRONMENT_BROWSER_TOKEN_SCOPES } from "./constants.ts";
+import { ADMIN_TOKEN_SCOPES, DEFAULT_ENVIRONMENT_BROWSER_TOKEN_SCOPES } from "./constants.ts";
 import { isDnsSafeSlug } from "./slug.ts";
 import {
   exchangePairingCodeForBearerToken,
@@ -22,6 +23,8 @@ export interface ValidatedEnvironmentInput {
   readonly label: string;
   readonly endpoint: string;
   readonly adminBearerToken: string;
+  readonly adminTokenExpiresAt: string | null;
+  readonly adminTokenLastCheckedAt: string | null;
   readonly browserTokenScopes: ReadonlyArray<string>;
   readonly environmentId: string;
   readonly descriptor: unknown;
@@ -40,17 +43,6 @@ const resolveBrowserTokenScopes = (scopes: ReadonlyArray<string> | undefined) =>
     : [...scopes];
 
 const environmentSlug = (environmentId: string) => `env-${environmentId.toLowerCase()}`;
-
-const ADMIN_TOKEN_SCOPES = [
-  "orchestration:read",
-  "orchestration:operate",
-  "terminal:operate",
-  "review:write",
-  "relay:read",
-  "access:read",
-  "access:write",
-  "relay:write",
-] as const;
 
 export const validateEnvironmentInput = (
   context: EnvironmentValidationContext,
@@ -145,9 +137,22 @@ export const validateEnvironmentInput = (
             )
           : "";
 
-    if (resolvedAdminBearerToken.length > 0) {
-      yield* validateAdminBearerToken(client, endpoint, resolvedAdminBearerToken);
+    const adminTokenSession =
+      resolvedAdminBearerToken.length === 0
+        ? null
+        : yield* validateAdminBearerToken(client, endpoint, resolvedAdminBearerToken);
+    if (adminTokenSession !== null) {
+      const missingScope = ADMIN_TOKEN_SCOPES.find(
+        (scope) => !adminTokenSession.scopes.includes(scope),
+      );
+      if (missingScope !== undefined) {
+        return yield* new EnvironmentFailure({
+          message: `Admin bearer token is missing required scope ${missingScope}`,
+        });
+      }
     }
+    const adminTokenLastCheckedAt =
+      adminTokenSession === null ? null : DateTime.formatIso(yield* DateTime.now);
 
     const publicUrls = computePublicUrls(slug, config.publicBaseDomain);
 
@@ -156,6 +161,8 @@ export const validateEnvironmentInput = (
       label,
       endpoint,
       adminBearerToken: resolvedAdminBearerToken,
+      adminTokenExpiresAt: adminTokenSession === null ? null : adminTokenSession.expiresAt,
+      adminTokenLastCheckedAt,
       browserTokenScopes: resolveBrowserTokenScopes(input.browserTokenScopes),
       environmentId,
       descriptor,

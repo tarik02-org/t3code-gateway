@@ -17,7 +17,6 @@ const OAUTH_TOKEN_PATH = "/oauth/token";
 const CLIENTS_PATH = "/api/auth/clients";
 const CLIENTS_REVOKE_PATH = "/api/auth/clients/revoke";
 const PAIRING_TOKEN_PATH = "/api/auth/pairing-token";
-const ADMIN_TOKEN_CHECK_PATH = CLIENTS_PATH;
 
 const EnvironmentClientMetadataDeviceType = Schema.Literals([
   "desktop",
@@ -153,37 +152,18 @@ export const validateAdminBearerToken = (
   internalHttpBaseUrl: string,
   adminBearerToken: string,
 ) =>
-  Effect.gen(function* () {
-    const url = joinBaseUrl(internalHttpBaseUrl, ADMIN_TOKEN_CHECK_PATH);
-    const response = yield* client
-      .get(url, {
-        headers: {
-          authorization: `Bearer ${adminBearerToken}`,
-        },
-      })
-      .pipe(
-        Effect.catchTags({
-          HttpClientError: (error) =>
-            Effect.fail(
-              new EnvironmentFailure({
-                message: environmentHttpClientFailureMessage("validate admin token", url, error),
-              }),
-            ),
-        }),
-      );
-
-    if (response.status === 401 || response.status === 403) {
-      return yield* new EnvironmentFailure({
-        message: "Admin bearer token was rejected by the environment",
-      });
-    }
-
-    if (response.status !== 200) {
-      return yield* new EnvironmentFailure({
-        message: `Admin token validation failed with status ${response.status}`,
-      });
-    }
-  });
+  listClientSessions(client, internalHttpBaseUrl, adminBearerToken).pipe(
+    Effect.flatMap((sessions) => {
+      const current = sessions.find((session) => session.current);
+      return current === undefined
+        ? Effect.fail(
+            new EnvironmentFailure({
+              message: "Environment did not identify the current admin token session",
+            }),
+          )
+        : Effect.succeed(current);
+    }),
+  );
 
 export const exchangePairingCodeForBearerToken = (
   client: HttpClient.HttpClient,
@@ -235,6 +215,7 @@ export const exchangePairingCodeForBearerAccessToken = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Pairing code was rejected by the environment",
+        status: response.status,
       });
     }
 
@@ -301,6 +282,7 @@ export const createPairingCredential = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Admin bearer token was rejected by the environment",
+        status: response.status,
       });
     }
 
@@ -409,6 +391,7 @@ export const listClientSessions = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Admin bearer token was rejected by the environment",
+        status: response.status,
       });
     }
 

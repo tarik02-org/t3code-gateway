@@ -3,6 +3,7 @@ import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanst
 import type { ReactNode } from "react";
 
 import { ToastProvider } from "../components/ui/toast.tsx";
+import { TooltipProvider } from "../components/ui/tooltip.tsx";
 import appCss from "../styles/app.css?url";
 
 export interface RouterContext {
@@ -35,9 +36,11 @@ function RootComponent() {
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <Outlet />
-        </ToastProvider>
+        <TooltipProvider>
+          <ToastProvider>
+            <Outlet />
+          </ToastProvider>
+        </TooltipProvider>
       </QueryClientProvider>
     </RootDocument>
   );
