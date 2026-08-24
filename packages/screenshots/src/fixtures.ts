@@ -58,6 +58,11 @@ const environments = environmentEntries.map(([slug, label]) => ({
   endpoint: `https://${slug}.internal.example.com`,
   publicUrl: `https://${slug}.code.example.com/`,
   browserTokenScopes,
+  adminTokenStatus: {
+    _tag: "Healthy",
+    expiresAt: "2026-09-01T09:00:00.000Z",
+    lastCheckedAt: "2026-08-23T09:00:00.000Z",
+  },
   createdAt: "2026-07-01T09:00:00.000Z",
   updatedAt: "2026-07-01T09:00:00.000Z",
 })) satisfies ReadonlyArray<EnvironmentRecord>;

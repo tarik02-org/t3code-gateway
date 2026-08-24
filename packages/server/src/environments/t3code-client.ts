@@ -3,6 +3,7 @@ import type {
   RevokeEnvironmentClientResponse,
 } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpBody from "effect/unstable/http/HttpBody";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
@@ -17,7 +18,6 @@ const OAUTH_TOKEN_PATH = "/oauth/token";
 const CLIENTS_PATH = "/api/auth/clients";
 const CLIENTS_REVOKE_PATH = "/api/auth/clients/revoke";
 const PAIRING_TOKEN_PATH = "/api/auth/pairing-token";
-const ADMIN_TOKEN_CHECK_PATH = CLIENTS_PATH;
 
 const EnvironmentClientMetadataDeviceType = Schema.Literals([
   "desktop",
@@ -41,7 +41,7 @@ const T3ClientSession = Schema.Struct({
     browser: Schema.optional(Schema.String),
   }),
   issuedAt: Schema.String,
-  expiresAt: Schema.String,
+  expiresAt: Schema.DateTimeUtcFromString,
   lastConnectedAt: Schema.NullOr(Schema.String),
   connected: Schema.Boolean,
   current: Schema.Boolean,
@@ -153,37 +153,18 @@ export const validateAdminBearerToken = (
   internalHttpBaseUrl: string,
   adminBearerToken: string,
 ) =>
-  Effect.gen(function* () {
-    const url = joinBaseUrl(internalHttpBaseUrl, ADMIN_TOKEN_CHECK_PATH);
-    const response = yield* client
-      .get(url, {
-        headers: {
-          authorization: `Bearer ${adminBearerToken}`,
-        },
-      })
-      .pipe(
-        Effect.catchTags({
-          HttpClientError: (error) =>
-            Effect.fail(
-              new EnvironmentFailure({
-                message: environmentHttpClientFailureMessage("validate admin token", url, error),
-              }),
-            ),
-        }),
-      );
-
-    if (response.status === 401 || response.status === 403) {
-      return yield* new EnvironmentFailure({
-        message: "Admin bearer token was rejected by the environment",
-      });
-    }
-
-    if (response.status !== 200) {
-      return yield* new EnvironmentFailure({
-        message: `Admin token validation failed with status ${response.status}`,
-      });
-    }
-  });
+  listClientSessions(client, internalHttpBaseUrl, adminBearerToken).pipe(
+    Effect.flatMap((sessions) => {
+      const current = sessions.find((session) => session.current);
+      return current === undefined
+        ? Effect.fail(
+            new EnvironmentFailure({
+              message: "Environment did not identify the current admin token session",
+            }),
+          )
+        : Effect.succeed(current);
+    }),
+  );
 
 export const exchangePairingCodeForBearerToken = (
   client: HttpClient.HttpClient,
@@ -235,6 +216,7 @@ export const exchangePairingCodeForBearerAccessToken = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Pairing code was rejected by the environment",
+        status: response.status,
       });
     }
 
@@ -301,6 +283,7 @@ export const createPairingCredential = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Admin bearer token was rejected by the environment",
+        status: response.status,
       });
     }
 
@@ -358,7 +341,7 @@ const mapClientSession = (session: typeof T3ClientSession.Type): EnvironmentClie
   method: session.method,
   client: session.client,
   issuedAt: session.issuedAt,
-  expiresAt: session.expiresAt,
+  expiresAt: DateTime.formatIso(session.expiresAt),
   lastConnectedAt: session.lastConnectedAt,
   connected: session.connected,
   current: session.current,
@@ -409,6 +392,7 @@ export const listClientSessions = (
     if (response.status === 401 || response.status === 403) {
       return yield* new EnvironmentFailure({
         message: "Admin bearer token was rejected by the environment",
+        status: response.status,
       });
     }
 

@@ -41,6 +41,7 @@ export function EnvironmentPage() {
     queryKey: ENVIRONMENTS_QUERY_KEY,
     queryFn: listEnvironments,
     enabled: IS_BROWSER && currentUserQuery.data != null,
+    refetchInterval: 60_000,
   });
 
   const gatewayStatusQuery = useQuery({

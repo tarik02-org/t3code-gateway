@@ -16,6 +16,9 @@ export interface EnvironmentRow {
   readonly descriptorJson: string | null;
   readonly browserTokenScopesJson: string;
   readonly adminTokenEncrypted: Buffer;
+  readonly adminTokenExpiresAt: string | null;
+  readonly adminTokenLastCheckedAt: string | null;
+  readonly adminTokenFailureJson: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -29,19 +32,43 @@ export interface CreateEnvironmentInput {
   readonly descriptorJson: string;
   readonly browserTokenScopesJson: string;
   readonly adminTokenEncrypted: Buffer;
+  readonly adminTokenExpiresAt: string | null;
+  readonly adminTokenLastCheckedAt: string | null;
+  readonly adminTokenFailureJson: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-export interface UpdateEnvironmentInput {
+interface UpdateEnvironmentFields {
   readonly slug: string;
   readonly label: string;
   readonly endpoint: string;
   readonly descriptorJson: string;
   readonly browserTokenScopesJson: string;
-  readonly adminTokenEncrypted: Buffer;
   readonly enabled: boolean;
   readonly updatedAt: string;
+}
+
+export type UpdateEnvironmentInput =
+  | (UpdateEnvironmentFields & { readonly _tag: "KeepAdminToken" })
+  | (UpdateEnvironmentFields & {
+      readonly _tag: "ReplaceAdminToken";
+      readonly currentTokenEncrypted: Buffer;
+      readonly adminTokenEncrypted: Buffer;
+      readonly adminTokenExpiresAt: string | null;
+      readonly adminTokenLastCheckedAt: string | null;
+      readonly adminTokenFailureJson: string | null;
+    });
+
+export interface UpdateEnvironmentAdminTokenStateInput {
+  readonly currentTokenEncrypted: Buffer;
+  readonly expiresAt: string | null;
+  readonly lastCheckedAt: string;
+  readonly failureJson: string | null;
+}
+
+export interface ReplaceEnvironmentAdminTokenInput extends UpdateEnvironmentAdminTokenStateInput {
+  readonly nextTokenEncrypted: Buffer;
 }
 
 export class EnvironmentRepository extends Context.Service<
@@ -57,7 +84,15 @@ export class EnvironmentRepository extends Context.Service<
     readonly updateEnvironment: (
       environmentId: string,
       input: UpdateEnvironmentInput,
-    ) => Effect.Effect<void, DatabaseError>;
+    ) => Effect.Effect<boolean, DatabaseError>;
+    readonly updateEnvironmentAdminTokenState: (
+      environmentId: string,
+      input: UpdateEnvironmentAdminTokenStateInput,
+    ) => Effect.Effect<boolean, DatabaseError>;
+    readonly replaceEnvironmentAdminToken: (
+      environmentId: string,
+      input: ReplaceEnvironmentAdminTokenInput,
+    ) => Effect.Effect<boolean, DatabaseError>;
     readonly deleteEnvironment: (environmentId: string) => Effect.Effect<void, DatabaseError>;
     readonly findEnvironmentIdBySlug: (
       slug: string,
@@ -103,11 +138,89 @@ export const make = Effect.gen(function* () {
   const updateEnvironment = (environmentId: string, input: UpdateEnvironmentInput) =>
     db
       .update(environments)
-      .set(input)
-      .where(eq(environments.environmentId, environmentId))
+      .set(
+        input["_tag"] === "KeepAdminToken"
+          ? {
+              slug: input.slug,
+              label: input.label,
+              endpoint: input.endpoint,
+              descriptorJson: input.descriptorJson,
+              browserTokenScopesJson: input.browserTokenScopesJson,
+              enabled: input.enabled,
+              updatedAt: input.updatedAt,
+            }
+          : {
+              slug: input.slug,
+              label: input.label,
+              endpoint: input.endpoint,
+              descriptorJson: input.descriptorJson,
+              browserTokenScopesJson: input.browserTokenScopesJson,
+              adminTokenEncrypted: input.adminTokenEncrypted,
+              adminTokenExpiresAt: input.adminTokenExpiresAt,
+              adminTokenLastCheckedAt: input.adminTokenLastCheckedAt,
+              adminTokenFailureJson: input.adminTokenFailureJson,
+              enabled: input.enabled,
+              updatedAt: input.updatedAt,
+            },
+      )
+      .where(
+        input["_tag"] === "KeepAdminToken"
+          ? eq(environments.environmentId, environmentId)
+          : and(
+              eq(environments.environmentId, environmentId),
+              eq(environments.adminTokenEncrypted, input.currentTokenEncrypted),
+            ),
+      )
       .run()
       .pipe(
-        Effect.asVoid,
+        Effect.map((result) => result.changes > 0),
+        Effect.catchTags({ EffectDrizzleQueryError: (error) => queryError("environment", error) }),
+      );
+
+  const updateEnvironmentAdminTokenState = (
+    environmentId: string,
+    input: UpdateEnvironmentAdminTokenStateInput,
+  ) =>
+    db
+      .update(environments)
+      .set({
+        adminTokenExpiresAt: input.expiresAt,
+        adminTokenLastCheckedAt: input.lastCheckedAt,
+        adminTokenFailureJson: input.failureJson,
+      })
+      .where(
+        and(
+          eq(environments.environmentId, environmentId),
+          eq(environments.adminTokenEncrypted, input.currentTokenEncrypted),
+        ),
+      )
+      .run()
+      .pipe(
+        Effect.map((result) => result.changes > 0),
+        Effect.catchTags({ EffectDrizzleQueryError: (error) => queryError("environment", error) }),
+      );
+
+  const replaceEnvironmentAdminToken = (
+    environmentId: string,
+    input: ReplaceEnvironmentAdminTokenInput,
+  ) =>
+    db
+      .update(environments)
+      .set({
+        adminTokenEncrypted: input.nextTokenEncrypted,
+        adminTokenExpiresAt: input.expiresAt,
+        adminTokenLastCheckedAt: input.lastCheckedAt,
+        adminTokenFailureJson: input.failureJson,
+      })
+      .where(
+        and(
+          eq(environments.environmentId, environmentId),
+          eq(environments.adminTokenEncrypted, input.currentTokenEncrypted),
+        ),
+      )
+      .run()
+      .pipe(
+        Effect.map((result) => result.changes > 0),
         Effect.catchTags({ EffectDrizzleQueryError: (error) => queryError("environment", error) }),
       );
 
@@ -158,6 +271,8 @@ export const make = Effect.gen(function* () {
     findEnvironment,
     createEnvironment,
     updateEnvironment,
+    updateEnvironmentAdminTokenState,
+    replaceEnvironmentAdminToken,
     deleteEnvironment,
     findEnvironmentIdBySlug,
     findConflictingEnvironmentId,

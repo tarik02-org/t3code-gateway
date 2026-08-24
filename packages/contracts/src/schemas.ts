@@ -119,6 +119,35 @@ export const UpdateEnvironmentRequest = Schema.Struct({
 
 export type UpdateEnvironmentRequest = typeof UpdateEnvironmentRequest.Type;
 
+export const EnvironmentAdminTokenStatus = Schema.Union([
+  Schema.TaggedStruct("Unknown", {}),
+  Schema.TaggedStruct("Healthy", {
+    expiresAt: Schema.String,
+    lastCheckedAt: Schema.NullOr(Schema.String),
+  }),
+  Schema.TaggedStruct("RotationDue", {
+    expiresAt: Schema.String,
+    lastCheckedAt: Schema.NullOr(Schema.String),
+  }),
+  Schema.TaggedStruct("Retrying", {
+    expiresAt: Schema.NullOr(Schema.String),
+    lastAttemptAt: Schema.String,
+    message: Schema.String,
+  }),
+  Schema.TaggedStruct("RepairRequired", {
+    expiresAt: Schema.NullOr(Schema.String),
+    lastAttemptAt: Schema.String,
+    message: Schema.String,
+  }),
+  Schema.TaggedStruct("Paused", {
+    expiresAt: Schema.NullOr(Schema.String),
+    lastCheckedAt: Schema.NullOr(Schema.String),
+    lastFailure: Schema.NullOr(Schema.String),
+  }),
+]);
+
+export type EnvironmentAdminTokenStatus = typeof EnvironmentAdminTokenStatus.Type;
+
 export const EnvironmentRecord = Schema.Struct({
   environmentId: Schema.String,
   slug: Schema.String,
@@ -128,6 +157,7 @@ export const EnvironmentRecord = Schema.Struct({
   publicUrl: Schema.String,
   descriptor: Schema.optional(Schema.Unknown),
   browserTokenScopes: Schema.Array(Schema.String),
+  adminTokenStatus: EnvironmentAdminTokenStatus,
   createdAt: Schema.String,
   updatedAt: Schema.String,
 });

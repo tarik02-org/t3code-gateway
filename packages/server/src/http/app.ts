@@ -7,6 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schedule from "effect/Schedule";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer";
 import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
@@ -18,6 +19,11 @@ import { configLayer, GatewayRuntimeConfig } from "../config.ts";
 import { GatewayDatabase, layer as gatewayDatabaseLayer } from "../db/database.ts";
 import { layer as authRepositoryLayer } from "../db/auth-repository.ts";
 import { layer as environmentRepositoryLayer } from "../db/environment-repository.ts";
+import {
+  AdminTokenRotation,
+  AdminTokenRotationLive,
+} from "../environments/admin-token-rotation.ts";
+import { ADMIN_TOKEN_SWEEP_INTERVAL } from "../environments/constants.ts";
 import { layer as environmentServiceLayer } from "../environments/service.ts";
 import { layer as adminWebRoutesLayer } from "./admin-web-routes.ts";
 import { layer as authRoutesLayer } from "./auth-routes.ts";
@@ -52,7 +58,15 @@ const authLiveLayer = authLayer.pipe(
 
 const secretLiveLayer = secretEncryptionLayer.pipe(Layer.provide(foundationLayer));
 
+const adminTokenRotationLiveLayer = AdminTokenRotationLive.pipe(
+  Layer.provide(secretLiveLayer),
+  Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(environmentRepositoryLiveLayer),
+  Layer.provide(foundationLayer),
+);
+
 const environmentLiveLayer = environmentServiceLayer.pipe(
+  Layer.provide(adminTokenRotationLiveLayer),
   Layer.provide(secretLiveLayer),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(environmentRepositoryLiveLayer),
@@ -72,8 +86,17 @@ const bootstrapLayer = Layer.effectDiscard(
     yield* auth.bootstrapFirstUser();
     const traefik = yield* TraefikReconciler;
     yield* traefik.reconcile();
+    const adminTokens = yield* AdminTokenRotation;
+    yield* adminTokens.sweep.pipe(
+      Effect.repeat(Schedule.spaced(ADMIN_TOKEN_SWEEP_INTERVAL)),
+      Effect.forkScoped({ startImmediately: true }),
+    );
   }),
-).pipe(Layer.provide(traefikLiveLayer), Layer.provide(authLiveLayer));
+).pipe(
+  Layer.provide(traefikLiveLayer),
+  Layer.provide(authLiveLayer),
+  Layer.provide(adminTokenRotationLiveLayer),
+);
 
 const gatewayRpcLayer = RpcServer.layerHttp({
   group: GatewayRpcs,
