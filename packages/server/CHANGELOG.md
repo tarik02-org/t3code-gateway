@@ -1,5 +1,13 @@
 # @t3code-gateway/server
 
+## 0.1.4
+
+### Patch Changes
+
+- bf536be: rotate environment admin tokens before expiry and show their maintenance status
+- Updated dependencies [bf536be]
+  - @t3code-gateway/contracts@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes

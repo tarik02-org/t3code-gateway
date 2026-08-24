@@ -1,5 +1,12 @@
 # @t3code-gateway/screenshots
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [bf536be]
+  - @t3code-gateway/contracts@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
