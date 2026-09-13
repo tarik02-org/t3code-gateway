@@ -372,22 +372,14 @@ function T3CodeUpdatesDialog({
                       Remove old unpinned downloads during the periodic update check.
                     </p>
                   </div>
-                  <Switch
-                    id="t3code-auto-gc"
-                    checked={autoGc}
-                    onCheckedChange={(checked) =>
-                      saveDraft(updateChannel, autoUpdate, checked, keepRecent)
-                    }
-                  />
-                </div>
-                <div className="flex flex-col gap-2 border-t pt-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-col gap-1">
-                      <Label>Keep recent versions</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Per-channel downloaded versions kept by GC.
-                      </p>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="t3code-auto-gc"
+                      checked={autoGc}
+                      onCheckedChange={(checked) =>
+                        saveDraft(updateChannel, autoUpdate, checked, keepRecent)
+                      }
+                    />
                     <Button
                       size="xs"
                       variant="outline"
@@ -398,11 +390,20 @@ function T3CodeUpdatesDialog({
                       {gcMutation.isPending ? "Collecting..." : "GC now"}
                     </Button>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t pt-3">
+                  <div className="flex flex-col gap-1">
+                    <Label>Keep recent versions</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Per-channel downloaded versions kept by GC.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-2">
                     <Label className="flex items-center gap-2 text-xs">
                       Stable
                       <Input
                         nativeInput
+                        className="w-16"
                         type="number"
                         min={0}
                         value={keepRecent.stable}
@@ -421,6 +422,7 @@ function T3CodeUpdatesDialog({
                       Nightly
                       <Input
                         nativeInput
+                        className="w-16"
                         type="number"
                         min={0}
                         value={keepRecent.nightly}
