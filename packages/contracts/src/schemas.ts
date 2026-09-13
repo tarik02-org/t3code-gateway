@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 export const T3CodeWebVersionSource = Schema.Literals(["bundled", "downloaded"]);
+const T3CodeWebRetentionCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 export type T3CodeWebVersionSource = typeof T3CodeWebVersionSource.Type;
 
@@ -29,8 +30,8 @@ export const T3CodeWebStatus = Schema.Struct({
   autoUpdate: Schema.Boolean,
   autoGc: Schema.Boolean,
   keepRecent: Schema.Struct({
-    stable: Schema.Number,
-    nightly: Schema.Number,
+    stable: T3CodeWebRetentionCount,
+    nightly: T3CodeWebRetentionCount,
   }),
   versions: Schema.Array(T3CodeWebVersion),
 });
@@ -58,8 +59,8 @@ export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
   autoGc: Schema.optional(Schema.Boolean),
   keepRecent: Schema.optional(
     Schema.Struct({
-      stable: Schema.Number,
-      nightly: Schema.Number,
+      stable: T3CodeWebRetentionCount,
+      nightly: T3CodeWebRetentionCount,
     }),
   ),
 });
