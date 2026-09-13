@@ -20,7 +20,7 @@ export const buildGatewayStatus = Effect.fn("buildGatewayStatus")(function* () {
         ? yield* t3codeWeb.status
         : {
             available: false,
-            channel: "nightly" as const,
+            updateChannel: "nightly" as const,
             autoUpdate: false,
             versions: [],
           },

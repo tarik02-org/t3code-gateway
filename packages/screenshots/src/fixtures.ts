@@ -31,7 +31,7 @@ const gatewayStatus = {
   database: { migrated: true },
   t3codeWeb: {
     available: true,
-    channel: "nightly",
+    updateChannel: "nightly",
     autoUpdate: false,
     versions: [
       {

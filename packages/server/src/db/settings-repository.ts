@@ -13,7 +13,7 @@ import { GatewayDatabase } from "./database.ts";
 import { DatabaseError, queryError } from "./errors.ts";
 import { gatewaySettings } from "./schema.ts";
 
-const CHANNEL_KEY = "t3code.web.channel";
+const UPDATE_CHANNEL_KEY = "t3code.web.updateChannel";
 const AUTO_UPDATE_KEY = "t3code.web.autoUpdate";
 const PINNED_VERSION_KEYS = {
   stable: "t3code.web.pinned.stable",
@@ -30,7 +30,7 @@ const StoredGatewaySettings = Schema.Array(StoredGatewaySetting);
 const StoredAutoUpdate = Schema.Literals(["true", "false"]);
 
 export type GatewaySettings = {
-  readonly channel: T3CodeWebChannelType;
+  readonly updateChannel: T3CodeWebChannelType;
   readonly autoUpdate: boolean;
   readonly pinnedVersions: {
     readonly stable: string | null;
@@ -45,12 +45,12 @@ const invalidSettings = () =>
 const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, DatabaseError> =>
   Schema.decodeUnknownEffect(StoredGatewaySettings)(rows).pipe(
     Effect.flatMap((settings) => {
-      const channel = settings.find((setting) => setting.key === CHANNEL_KEY);
+      const updateChannel = settings.find((setting) => setting.key === UPDATE_CHANNEL_KEY);
       const autoUpdate = settings.find((setting) => setting.key === AUTO_UPDATE_KEY);
       const stablePin = settings.find((setting) => setting.key === PINNED_VERSION_KEYS.stable);
       const nightlyPin = settings.find((setting) => setting.key === PINNED_VERSION_KEYS.nightly);
       if (
-        channel === undefined ||
+        updateChannel === undefined ||
         autoUpdate === undefined ||
         stablePin === undefined ||
         nightlyPin === undefined
@@ -59,16 +59,18 @@ const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, Da
       }
       return Schema.decodeUnknownEffect(
         Schema.Struct({ channel: T3CodeWebChannel, autoUpdate: StoredAutoUpdate }),
-      )({ channel: channel.value, autoUpdate: autoUpdate.value }).pipe(
+      )({ channel: updateChannel.value, autoUpdate: autoUpdate.value }).pipe(
         Effect.map((decoded) => ({
-          channel: decoded.channel,
+          updateChannel: decoded.channel,
           autoUpdate: decoded.autoUpdate === "true",
           pinnedVersions: {
             stable: stablePin.value === "" ? null : stablePin.value,
             nightly: nightlyPin.value === "" ? null : nightlyPin.value,
           },
           updatedAt:
-            channel.updatedAt > autoUpdate.updatedAt ? channel.updatedAt : autoUpdate.updatedAt,
+            updateChannel.updatedAt > autoUpdate.updatedAt
+              ? updateChannel.updatedAt
+              : autoUpdate.updatedAt,
         })),
         Effect.catchTag("SchemaError", () => invalidSettings()),
       );
@@ -81,7 +83,7 @@ export class SettingsRepository extends Context.Service<
   {
     readonly get: Effect.Effect<GatewaySettings, DatabaseError>;
     readonly update: (
-      input: Partial<Pick<GatewaySettings, "channel" | "autoUpdate">> & {
+      input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate">> & {
         readonly updatedAt: string;
         readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
       },
@@ -104,16 +106,22 @@ export const make = Effect.gen(function* () {
     );
 
   const update = (
-    input: Partial<Pick<GatewaySettings, "channel" | "autoUpdate">> & {
+    input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate">> & {
       readonly updatedAt: string;
       readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
     },
   ) =>
     Effect.gen(function* () {
       const values = [
-        ...(input.channel === undefined
+        ...(input.updateChannel === undefined
           ? []
-          : [{ key: CHANNEL_KEY, value: input.channel, updatedAt: input.updatedAt }]),
+          : [
+              {
+                key: UPDATE_CHANNEL_KEY,
+                value: input.updateChannel,
+                updatedAt: input.updatedAt,
+              },
+            ]),
         ...(input.autoUpdate === undefined
           ? []
           : [

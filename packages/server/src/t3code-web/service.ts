@@ -195,7 +195,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     }
     return {
       available: staticRoot !== null && records.length > 0,
-      channel: current.channel,
+      updateChannel: current.updateChannel,
       autoUpdate: current.autoUpdate,
       versions: records
         .map((record) => ({
@@ -226,8 +226,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const initialize = Effect.fn("T3CodeWebService.initialize")(function* () {
     yield* fs.makeDirectory(downloadedRoot, { recursive: true });
     const current = yield* readSettings;
-    const records = yield* listChannelVersions(current.channel);
-    const preferred = selectPreferred(records, current.pinnedVersions[current.channel]);
+    const records = yield* listChannelVersions(current.updateChannel);
+    const preferred = selectPreferred(records, current.pinnedVersions[current.updateChannel]);
     if (preferred !== undefined) {
       yield* activateRoot(preferred.root).pipe(
         Effect.catchTag("PlatformError", () =>
@@ -359,11 +359,9 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const updateSettings = Effect.fn("T3CodeWebService.updateSettings")(function* (
     input: UpdateT3CodeWebSettingsRequest,
   ) {
-    const current = yield* readSettings;
-    const nextChannel = input.channel ?? current.channel;
     const nextSettings = {
       updatedAt: DateTime.formatIso(yield* DateTime.now),
-      ...(input.channel === undefined ? {} : { channel: input.channel }),
+      ...(input.updateChannel === undefined ? {} : { updateChannel: input.updateChannel }),
       ...(input.autoUpdate === undefined ? {} : { autoUpdate: input.autoUpdate }),
     };
     yield* settings
@@ -373,18 +371,6 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
           Effect.fail(storageFailure("Could not save T3 Code Web settings")),
         ),
       );
-    if (nextChannel !== current.channel) {
-      const next = yield* listChannelVersions(nextChannel);
-      const preferred = selectPreferred(next, current.pinnedVersions[nextChannel]);
-      if (preferred === undefined) {
-        return yield* storageFailure(`The ${nextChannel} T3 Code channel is unavailable`);
-      }
-      yield* activateRoot(preferred.root).pipe(
-        Effect.catchTag("PlatformError", () =>
-          Effect.fail(storageFailure("Could not activate T3 Code Web")),
-        ),
-      );
-    }
     return yield* status();
   });
 
@@ -417,7 +403,6 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     }
     yield* activateRoot(record.root);
     yield* settings.update({
-      channel,
       pinnedVersions: { [channel]: version },
       updatedAt: DateTime.formatIso(yield* DateTime.now),
     });
@@ -484,7 +469,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const runAutomaticUpdate = Effect.fn("T3CodeWebService.runAutomaticUpdate")(function* () {
     const current = yield* readSettings;
     if (current.autoUpdate) {
-      yield* checkForUpdates(current.channel);
+      yield* checkForUpdates(current.updateChannel);
     }
   });
 

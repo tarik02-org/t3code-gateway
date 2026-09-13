@@ -19,6 +19,7 @@ import { Badge } from "./ui/badge.tsx";
 import { Input } from "./ui/input.tsx";
 import { Label } from "./ui/label.tsx";
 import { Switch } from "./ui/switch.tsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
 import { T3Logo } from "./logo.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
@@ -86,7 +87,7 @@ function T3CodeUpdatesDialog({
   settings: GatewayStatus["t3codeWeb"] | undefined;
 }>) {
   const queryClient = useQueryClient();
-  const [channel, setChannel] = useState<T3CodeWebChannel>("nightly");
+  const [updateChannel, setUpdateChannel] = useState<T3CodeWebChannel>("nightly");
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -123,13 +124,13 @@ function T3CodeUpdatesDialog({
       applyStatus(nextStatus);
       const previousVersion =
         settings?.versions
-          .filter((version) => version.channel === channel)
+          .filter((version) => version.channel === updateChannel)
           .map((version) => version.version)
           .toSorted()
           .at(-1) ?? null;
       const nextVersion =
         nextStatus.t3codeWeb.versions
-          .filter((version) => version.channel === channel)
+          .filter((version) => version.channel === updateChannel)
           .map((version) => version.version)
           .toSorted()
           .at(-1) ?? null;
@@ -187,13 +188,13 @@ function T3CodeUpdatesDialog({
     },
   });
 
-  const saveDraft = (nextChannel: T3CodeWebChannel, nextAutoUpdate: boolean) => {
-    setChannel(nextChannel);
+  const saveDraft = (nextUpdateChannel: T3CodeWebChannel, nextAutoUpdate: boolean) => {
+    setUpdateChannel(nextUpdateChannel);
     setAutoUpdate(nextAutoUpdate);
     setMessage("Saving...");
     setError(null);
     setUpdateResult(null);
-    settingsMutation.mutate({ channel: nextChannel, autoUpdate: nextAutoUpdate });
+    settingsMutation.mutate({ updateChannel: nextUpdateChannel, autoUpdate: nextAutoUpdate });
   };
 
   return (
@@ -202,7 +203,7 @@ function T3CodeUpdatesDialog({
         open={open}
         onOpenChange={(nextOpen) => {
           if (nextOpen && settings !== undefined) {
-            setChannel(settings.channel);
+            setUpdateChannel(settings.updateChannel);
             setAutoUpdate(settings.autoUpdate);
             setMessage(null);
             setError(null);
@@ -221,119 +222,121 @@ function T3CodeUpdatesDialog({
           <DialogPanel>
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <Label>Channel</Label>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  value={channel}
-                  onValueChange={(value) => {
-                    if (value === "stable" || value === "nightly") {
-                      saveDraft(value, autoUpdate);
-                    }
-                  }}
-                  aria-label="T3 Code update channel"
-                >
-                  <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
-                  <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
-                </ToggleGroup>
-                <div className="flex flex-col gap-2">
-                  {(settings?.versions ?? []).map((version) => (
-                    <div
-                      key={`${version.channel}:${version.version}`}
-                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{version.channel}</Badge>
-                          <span className="font-mono text-xs">{version.version}</span>
-                          {version.active ? <Badge>Active</Badge> : null}
-                          {version.pinned ? <Badge variant="secondary">Pinned</Badge> : null}
-                          {version.forcedPinned ? <Badge variant="secondary">Bundled</Badge> : null}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-1">
-                        {!version.active ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            disabled={activateMutation.isPending}
-                            onClick={() =>
-                              activateMutation.mutate({
-                                channel: version.channel,
-                                version: version.version,
-                              })
-                            }
-                          >
-                            <PlayIcon data-icon="inline-start" />
-                            Activate
-                          </Button>
-                        ) : null}
-                        {!version.forcedPinned && version.pinned ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            disabled={pinMutation.isPending}
-                            onClick={() =>
-                              pinMutation.mutate({ channel: version.channel, version: null })
-                            }
-                          >
-                            <PinOffIcon data-icon="inline-start" />
-                            Unpin
-                          </Button>
-                        ) : null}
-                        {!version.forcedPinned && !version.pinned ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            disabled={pinMutation.isPending}
-                            onClick={() =>
-                              pinMutation.mutate({
-                                channel: version.channel,
-                                version: version.version,
-                              })
-                            }
-                          >
-                            <PinIcon data-icon="inline-start" />
-                            Pin
-                          </Button>
-                        ) : null}
-                        {version.source === "downloaded" && !version.active && !version.pinned ? (
-                          <Button
-                            size="xs"
-                            variant="destructive"
-                            disabled={removeMutation.isPending}
-                            onClick={() =>
-                              setRemoveCandidate({
-                                channel: version.channel,
-                                version: version.version,
-                              })
-                            }
-                          >
-                            <Trash2Icon data-icon="inline-start" />
-                            Remove
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                  {(settings?.versions.length ?? 0) === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No T3 Code versions are installed.
-                    </p>
-                  ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Installed versions</Label>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={gcMutation.isPending}
+                    onClick={() => gcMutation.mutate()}
+                  >
+                    <Trash2Icon data-icon="inline-start" />
+                    {gcMutation.isPending ? "Collecting..." : "GC unused"}
+                  </Button>
                 </div>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <Label>Installed versions</Label>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={gcMutation.isPending}
-                  onClick={() => gcMutation.mutate()}
-                >
-                  <Trash2Icon data-icon="inline-start" />
-                  {gcMutation.isPending ? "Collecting..." : "GC unused"}
-                </Button>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Channel</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(settings?.versions.length ?? 0) === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-muted-foreground">
+                          No T3 Code versions are installed.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                    {(settings?.versions ?? []).map((version) => (
+                      <TableRow key={`${version.channel}:${version.version}`}>
+                        <TableCell className="font-mono text-xs">{version.version}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{version.channel}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {version.active ? <Badge>Active</Badge> : null}
+                            {version.pinned ? <Badge variant="secondary">Pinned</Badge> : null}
+                            {version.forcedPinned ? (
+                              <Badge variant="secondary">Bundled</Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            {!version.active ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                disabled={activateMutation.isPending}
+                                onClick={() =>
+                                  activateMutation.mutate({
+                                    channel: version.channel,
+                                    version: version.version,
+                                  })
+                                }
+                              >
+                                <PlayIcon data-icon="inline-start" />
+                                Activate
+                              </Button>
+                            ) : null}
+                            {!version.forcedPinned && version.pinned ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                disabled={pinMutation.isPending}
+                                onClick={() =>
+                                  pinMutation.mutate({ channel: version.channel, version: null })
+                                }
+                              >
+                                <PinOffIcon data-icon="inline-start" />
+                                Unpin
+                              </Button>
+                            ) : null}
+                            {!version.forcedPinned && !version.pinned ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                disabled={pinMutation.isPending}
+                                onClick={() =>
+                                  pinMutation.mutate({
+                                    channel: version.channel,
+                                    version: version.version,
+                                  })
+                                }
+                              >
+                                <PinIcon data-icon="inline-start" />
+                                Pin
+                              </Button>
+                            ) : null}
+                            {version.source === "downloaded" &&
+                            !version.active &&
+                            !version.pinned ? (
+                              <Button
+                                size="xs"
+                                variant="destructive"
+                                disabled={removeMutation.isPending}
+                                onClick={() =>
+                                  setRemoveCandidate({
+                                    channel: version.channel,
+                                    version: version.version,
+                                  })
+                                }
+                              >
+                                <Trash2Icon data-icon="inline-start" />
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
               <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
                 <div className="flex flex-col gap-1">
@@ -345,8 +348,30 @@ function T3CodeUpdatesDialog({
                 <Switch
                   id="t3code-auto-update"
                   checked={autoUpdate}
-                  onCheckedChange={(checked) => saveDraft(channel, checked)}
+                  onCheckedChange={(checked) => saveDraft(updateChannel, checked)}
                 />
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t pt-3">
+                <div className="flex flex-col gap-1">
+                  <Label>Update channel</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatic updates download and switch within this channel.
+                  </p>
+                </div>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={updateChannel}
+                  onValueChange={(value) => {
+                    if (value === "stable" || value === "nightly") {
+                      saveDraft(value, autoUpdate);
+                    }
+                  }}
+                  aria-label="Automatic update channel"
+                >
+                  <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
+                  <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
+                </ToggleGroup>
               </div>
             </div>
           </DialogPanel>
@@ -362,7 +387,7 @@ function T3CodeUpdatesDialog({
               size="xs"
               type="button"
               disabled={checkMutation.isPending}
-              onClick={() => checkMutation.mutate({ channel })}
+              onClick={() => checkMutation.mutate({ channel: updateChannel })}
             >
               <RefreshCwIcon data-icon="inline-start" />
               {checkMutation.isPending
