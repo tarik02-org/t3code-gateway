@@ -234,7 +234,7 @@ function T3CodeUpdatesDialog({
           onOpenChange(nextOpen);
         }}
       >
-        <DialogPopup className="max-w-4xl">
+        <DialogPopup className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>T3 Code Versions</DialogTitle>
             <DialogDescription>
