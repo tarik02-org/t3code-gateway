@@ -85,6 +85,7 @@ function T3CodeUpdatesDialog({
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
 
   const settingsMutation = useMutation({
     mutationFn: updateT3CodeWebSettings,
@@ -101,14 +102,16 @@ function T3CodeUpdatesDialog({
 
   const checkMutation = useMutation({
     mutationFn: checkT3CodeWebUpdates,
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not check for updates.");
+      setUpdateResult(null);
+    },
     onSuccess: (nextStatus) => {
       queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
-      setMessage("Update check complete.");
+      const previousVersion = settings?.channels[channel].installedVersion ?? null;
+      const nextVersion = nextStatus.t3codeWeb.channels[channel].installedVersion;
+      setUpdateResult(previousVersion === nextVersion ? "none" : "updated");
       setError(null);
-    },
-    onError: (cause) => {
-      setMessage(null);
-      setError(cause instanceof Error ? cause.message : "Could not check for updates.");
     },
   });
 
@@ -117,6 +120,7 @@ function T3CodeUpdatesDialog({
     setAutoUpdate(nextAutoUpdate);
     setMessage("Saving...");
     setError(null);
+    setUpdateResult(null);
     settingsMutation.mutate({ channel: nextChannel, autoUpdate: nextAutoUpdate });
   };
 
@@ -129,6 +133,7 @@ function T3CodeUpdatesDialog({
           setAutoUpdate(settings.autoUpdate);
           setMessage(null);
           setError(null);
+          setUpdateResult(null);
         }
         onOpenChange(nextOpen);
       }}
@@ -180,11 +185,16 @@ function T3CodeUpdatesDialog({
                 onCheckedChange={(checked) => saveDraft(channel, checked)}
               />
             </div>
-            {message !== null ? <p className="text-xs text-success-foreground">{message}</p> : null}
-            {error !== null ? <p className="text-xs text-destructive-foreground">{error}</p> : null}
           </div>
         </DialogPanel>
         <DialogFooter>
+          <div className="flex-1 text-xs sm:mr-auto">
+            {error !== null ? (
+              <span className="text-destructive-foreground">{error}</span>
+            ) : message !== null ? (
+              <span className="text-success-foreground">{message}</span>
+            ) : null}
+          </div>
           <Button
             size="xs"
             type="button"
@@ -192,7 +202,13 @@ function T3CodeUpdatesDialog({
             onClick={() => checkMutation.mutate({ channel })}
           >
             <RefreshCwIcon data-icon="inline-start" />
-            {checkMutation.isPending ? "Checking..." : "Check for updates"}
+            {checkMutation.isPending
+              ? "Updating..."
+              : updateResult === "updated"
+                ? "Updated"
+                : updateResult === "none"
+                  ? "No updates available"
+                  : "Check for updates"}
           </Button>
         </DialogFooter>
       </DialogPopup>

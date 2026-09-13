@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -83,30 +83,40 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const updateKey = (key: string, value: string, updatedAt: string) =>
-    db
-      .update(gatewaySettings)
-      .set({ value, updatedAt })
-      .where(eq(gatewaySettings.key, key))
-      .run()
-      .pipe(
-        Effect.asVoid,
-        Effect.catchTags({
-          EffectDrizzleQueryError: (error) => queryError("settings", error),
-        }),
-      );
-
   const update = (
     input: Partial<Pick<GatewaySettings, "channel" | "autoUpdate">> & {
       readonly updatedAt: string;
     },
   ) =>
     Effect.gen(function* () {
-      if (input.channel !== undefined) {
-        yield* updateKey(CHANNEL_KEY, input.channel, input.updatedAt);
-      }
-      if (input.autoUpdate !== undefined) {
-        yield* updateKey(AUTO_UPDATE_KEY, String(input.autoUpdate), input.updatedAt);
+      const values = [
+        ...(input.channel === undefined
+          ? []
+          : [{ key: CHANNEL_KEY, value: input.channel, updatedAt: input.updatedAt }]),
+        ...(input.autoUpdate === undefined
+          ? []
+          : [
+              { key: AUTO_UPDATE_KEY, value: String(input.autoUpdate), updatedAt: input.updatedAt },
+            ]),
+      ];
+      if (values.length > 0) {
+        yield* db
+          .insert(gatewaySettings)
+          .values(values)
+          .onConflictDoUpdate({
+            target: gatewaySettings.key,
+            set: {
+              value: sql`excluded.value`,
+              updatedAt: input.updatedAt,
+            },
+          })
+          .run()
+          .pipe(
+            Effect.asVoid,
+            Effect.catchTags({
+              EffectDrizzleQueryError: (error) => queryError("settings", error),
+            }),
+          );
       }
       return yield* read;
     });
