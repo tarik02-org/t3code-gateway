@@ -16,6 +16,8 @@ import {
   RevokeEnvironmentClientResponse,
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
+  T3CodeWebFailure,
+  UpdateT3CodeWebSettingsRequest,
   TraefikConfigResponse,
   UpdateEnvironmentRequest,
   ValidateEnvironmentResponse,
@@ -61,6 +63,12 @@ export const RevokeEnvironmentClientPayload = Schema.Struct({
 });
 
 export type RevokeEnvironmentClientPayload = typeof RevokeEnvironmentClientPayload.Type;
+
+export class UpdateT3CodeWebSettings extends Rpc.make("gateway.t3codeWeb.settings.update", {
+  payload: UpdateT3CodeWebSettingsRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
 
 export class GetCurrentUser extends Rpc.make("gateway.auth.me", {
   success: Schema.NullOr(CurrentUser),
@@ -159,4 +167,5 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateT3CodeCatalogEntry,
   RevokeEnvironmentClient,
   GetTraefikConfig,
+  UpdateT3CodeWebSettings,
 ) {}

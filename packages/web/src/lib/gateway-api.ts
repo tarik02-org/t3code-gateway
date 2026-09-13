@@ -13,6 +13,7 @@ import type {
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
   TraefikConfigResponse,
+  UpdateT3CodeWebSettingsRequest,
   UpdateEnvironmentRequest,
   ValidateEnvironmentResponse,
 } from "@t3code-gateway/contracts/schemas";
@@ -66,6 +67,12 @@ export async function changePassword(payload: ChangePasswordRequest): Promise<vo
 
 export async function getGatewayStatus(): Promise<GatewayStatus> {
   return runGatewayRpc((client) => client["gateway.status"](undefined));
+}
+
+export async function updateT3CodeWebSettings(
+  payload: UpdateT3CodeWebSettingsRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.settings.update"](payload));
 }
 
 export async function getTraefikConfig(): Promise<TraefikConfigResponse> {

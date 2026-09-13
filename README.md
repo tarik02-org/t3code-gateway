@@ -45,6 +45,10 @@ docker run \
 
 Open `/admin/login`. On first start, the gateway logs the generated password for the `admin` user.
 
+The image includes both stable and nightly T3 Code Web builds. After signing in, use the `T3 Code`
+settings button to switch channels. GitHub-backed automatic updates are disabled by default and can
+be enabled there for the selected channel; downloaded builds are stored in the gateway data volume.
+
 Use an external Traefik instance with `/data/traefik/environments.yml`, or enable the bundled one
 with `T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED=true` and expose ports `80` and `443`.
 

@@ -102,7 +102,7 @@ export const layer = Layer.effectDiscard(
 
     yield* router.add("GET", "/api/gateway/status", () =>
       Effect.gen(function* () {
-        const status = yield* buildGatewayStatus;
+        const status = yield* buildGatewayStatus().pipe(Effect.orDie);
         return yield* HttpServerResponse.json(status satisfies GatewayStatus);
       }),
     );

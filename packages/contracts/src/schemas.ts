@@ -8,11 +8,39 @@ export const GatewayStatus = Schema.Struct({
   }),
   t3codeWeb: Schema.Struct({
     available: Schema.Boolean,
-    buildId: Schema.optional(Schema.String),
+    channel: Schema.Literals(["stable", "nightly"]),
+    autoUpdate: Schema.Boolean,
+    channels: Schema.Struct({
+      stable: Schema.Struct({
+        installedVersion: Schema.NullOr(Schema.String),
+      }),
+      nightly: Schema.Struct({
+        installedVersion: Schema.NullOr(Schema.String),
+      }),
+    }),
   }),
 });
 
 export type GatewayStatus = typeof GatewayStatus.Type;
+
+export const T3CodeWebChannel = Schema.Literals(["stable", "nightly"]);
+
+export type T3CodeWebChannel = typeof T3CodeWebChannel.Type;
+
+export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
+  channel: Schema.optional(T3CodeWebChannel),
+  autoUpdate: Schema.optional(Schema.Boolean),
+});
+
+export type UpdateT3CodeWebSettingsRequest = typeof UpdateT3CodeWebSettingsRequest.Type;
+
+export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
+  "T3CodeWebFailure",
+  {
+    message: Schema.String,
+    status: Schema.optional(Schema.Number),
+  },
+) {}
 
 export const LoginRequest = Schema.Struct({
   username: Schema.String,

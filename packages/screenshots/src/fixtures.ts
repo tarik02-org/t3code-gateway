@@ -29,7 +29,15 @@ const gatewayStatus = {
   ok: true,
   version: "screenshot-build",
   database: { migrated: true },
-  t3codeWeb: { available: true, buildId: "screenshot-build" },
+  t3codeWeb: {
+    available: true,
+    channel: "nightly",
+    autoUpdate: false,
+    channels: {
+      stable: { installedVersion: "2026.9.700" },
+      nightly: { installedVersion: "2026.8.2901-nightly.20260907.483" },
+    },
+  },
 } satisfies GatewayStatus;
 
 const browserTokenScopes = [

@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Settings2Icon } from "lucide-react";
 import { useState } from "react";
+
+import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
 
 import { Button } from "./ui/button.tsx";
 import {
@@ -9,21 +12,29 @@ import {
   DialogHeader,
   DialogPanel,
   DialogPopup,
+  DialogDescription,
   DialogTitle,
 } from "./ui/dialog.tsx";
+import { Badge } from "./ui/badge.tsx";
 import { Input } from "./ui/input.tsx";
 import { Label } from "./ui/label.tsx";
+import { Switch } from "./ui/switch.tsx";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
 import { T3Logo } from "./logo.tsx";
-import { changePassword } from "../lib/gateway-api.ts";
+import { changePassword, updateT3CodeWebSettings } from "../lib/gateway-api.ts";
+import { GATEWAY_STATUS_QUERY_KEY } from "../features/environments/query-keys.ts";
 
 export function AdminShell({
   actions,
   children,
+  t3codeWeb,
 }: Readonly<{
   actions?: ReactNode;
   children: ReactNode;
+  t3codeWeb: GatewayStatus["t3codeWeb"] | undefined;
 }>) {
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <main className="flex h-dvh flex-col text-foreground">
@@ -37,6 +48,12 @@ export function AdminShell({
         <Button size="xs" variant="outline" onClick={() => setPasswordOpen(true)}>
           Reset password
         </Button>
+        {t3codeWeb?.available === true ? (
+          <Button size="xs" variant="outline" onClick={() => setSettingsOpen(true)}>
+            <Settings2Icon data-icon="inline-start" />
+            T3 Code
+          </Button>
+        ) : null}
         {actions}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -45,7 +62,112 @@ export function AdminShell({
         </div>
       </div>
       <ResetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+      <T3CodeSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={t3codeWeb}
+      />
     </main>
+  );
+}
+
+function T3CodeSettingsDialog({
+  open,
+  onOpenChange,
+  settings,
+}: Readonly<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  settings: GatewayStatus["t3codeWeb"] | undefined;
+}>) {
+  const queryClient = useQueryClient();
+  const [channel, setChannel] = useState<T3CodeWebChannel>("nightly");
+  const [autoUpdate, setAutoUpdate] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: updateT3CodeWebSettings,
+    onSuccess: (nextStatus) => {
+      queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
+      setError(null);
+      onOpenChange(false);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not save T3 Code settings.");
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen && settings !== undefined) {
+          setChannel(settings.channel);
+          setAutoUpdate(settings.autoUpdate);
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogPopup className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>T3 Code settings</DialogTitle>
+          <DialogDescription>Choose which bundled channel the gateway serves.</DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <Label>Channel</Label>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={channel}
+                onValueChange={(value) => {
+                  if (value === "stable" || value === "nightly") {
+                    setChannel(value);
+                  }
+                }}
+                aria-label="T3 Code channel"
+              >
+                <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
+                <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
+              </ToggleGroup>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">
+                  Stable {settings?.channels.stable.installedVersion ?? "not installed"}
+                </Badge>
+                <Badge variant="outline">
+                  Nightly {settings?.channels.nightly.installedVersion ?? "not installed"}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="t3code-auto-update">Automatic updates</Label>
+                <p className="text-xs text-muted-foreground">
+                  Check GitHub periodically for the selected channel.
+                </p>
+              </div>
+              <Switch
+                id="t3code-auto-update"
+                checked={autoUpdate}
+                onCheckedChange={setAutoUpdate}
+              />
+            </div>
+            {error !== null ? <p className="text-xs text-destructive-foreground">{error}</p> : null}
+          </div>
+        </DialogPanel>
+        <DialogFooter>
+          <Button
+            size="xs"
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate({ channel, autoUpdate })}
+          >
+            {mutation.isPending ? "Saving..." : "Save settings"}
+          </Button>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }
 

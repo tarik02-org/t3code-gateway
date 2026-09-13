@@ -33,8 +33,16 @@ if [ -z "${T3_GATEWAY_ADMIN_STATIC_ROOT+x}" ]; then
   export T3_GATEWAY_ADMIN_STATIC_ROOT="${app_root}/packages/web/dist/client"
 fi
 
-if [ -z "${T3_GATEWAY_T3CODE_WEB_STATIC_ROOT+x}" ] && [ -f "${app_root}/t3code-web-dist/index.html" ]; then
-  export T3_GATEWAY_T3CODE_WEB_STATIC_ROOT="${app_root}/t3code-web-dist"
+if [ -z "${T3_GATEWAY_T3CODE_WEB_BUNDLED_ROOT+x}" ] && [ -f "${app_root}/t3code-web-dist/stable/index.html" ]; then
+  export T3_GATEWAY_T3CODE_WEB_BUNDLED_ROOT="${app_root}/t3code-web-dist"
+fi
+
+if [ -z "${T3_GATEWAY_T3CODE_WEB_STATIC_ROOT+x}" ] && [ -n "${T3_GATEWAY_T3CODE_WEB_BUNDLED_ROOT:-}" ]; then
+  export T3_GATEWAY_T3CODE_WEB_STATIC_ROOT="${data_dir}/t3code-web/current"
+fi
+
+if [ -z "${T3_GATEWAY_T3CODE_WEB_DATA_ROOT+x}" ]; then
+  export T3_GATEWAY_T3CODE_WEB_DATA_ROOT="${data_dir}/t3code-web"
 fi
 
 cd "${app_root}"

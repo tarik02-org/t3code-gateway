@@ -1,5 +1,14 @@
 import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const gatewaySettings = sqliteTable("gateway_settings", {
+  id: integer("id").primaryKey(),
+  t3codeWebChannel: text("t3code_web_channel").notNull().default("nightly"),
+  t3codeWebAutoUpdate: integer("t3code_web_auto_update", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),

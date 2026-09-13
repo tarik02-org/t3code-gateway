@@ -20,6 +20,7 @@ import * as Layer from "effect/Layer";
 import { AuthService } from "../auth/service.ts";
 import type { DatabaseError } from "../db/errors.ts";
 import { EnvironmentService } from "../environments/service.ts";
+import { T3CodeWebService } from "../t3code-web/service.ts";
 import { TraefikReconciler } from "../traefik/reconciler.ts";
 import { buildGatewayStatus } from "./status.ts";
 import { layer as gatewaySessionMiddlewareLayer } from "./gateway-session-middleware.ts";
@@ -39,6 +40,7 @@ export const layer = GatewayRpcs.toLayer(
     const auth = yield* AuthService;
     const environments = yield* EnvironmentService;
     const traefik = yield* TraefikReconciler;
+    const t3codeWeb = yield* T3CodeWebService;
 
     return GatewayRpcs.of({
       "gateway.auth.me": () =>
@@ -58,7 +60,13 @@ export const layer = GatewayRpcs.toLayer(
           }),
         ),
 
-      "gateway.status": () => buildGatewayStatus,
+      "gateway.status": () => buildGatewayStatus().pipe(Effect.orDie),
+
+      "gateway.t3codeWeb.settings.update": (payload) =>
+        t3codeWeb.updateSettings(payload).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
 
       "gateway.environments.list": () =>
         environments.list().pipe(Effect.catchTags(environmentRpcDatabaseErrors)),
