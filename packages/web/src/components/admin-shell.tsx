@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ExternalLinkIcon,
-  PinIcon,
-  PinOffIcon,
-  PlayIcon,
-  RefreshCwIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { ExternalLinkIcon, PlayIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
@@ -251,24 +244,13 @@ function T3CodeUpdatesDialog({
           <DialogPanel>
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label>Installed versions</Label>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    disabled={gcMutation.isPending}
-                    onClick={() => gcMutation.mutate()}
-                  >
-                    <Trash2Icon data-icon="inline-start" />
-                    {gcMutation.isPending ? "Collecting..." : "GC unused"}
-                  </Button>
-                </div>
+                <Label>Installed versions</Label>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Version</TableHead>
                       <TableHead>Channel</TableHead>
-                      <TableHead>State</TableHead>
+                      <TableHead>Pinned</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -284,64 +266,42 @@ function T3CodeUpdatesDialog({
                       <TableRow key={`${version.channel}:${version.version}`}>
                         <TableCell className="font-mono text-xs">{version.version}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{version.channel}</Badge>
-                        </TableCell>
-                        <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {version.active ? <Badge>Active</Badge> : null}
-                            {version.pinned ? <Badge variant="secondary">Pinned</Badge> : null}
+                            <Badge variant="outline">{version.channel}</Badge>
                             {version.forcedPinned ? (
                               <Badge variant="secondary">Bundled</Badge>
                             ) : null}
                           </div>
                         </TableCell>
                         <TableCell>
+                          <Switch
+                            checked={version.pinned}
+                            disabled={version.forcedPinned || pinMutation.isPending}
+                            aria-label={`Pin ${version.version}`}
+                            onCheckedChange={(checked) =>
+                              pinMutation.mutate({
+                                channel: version.channel,
+                                version: checked ? version.version : null,
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex justify-end gap-1">
-                            {!version.active ? (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                disabled={activateMutation.isPending}
-                                onClick={() =>
-                                  activateMutation.mutate({
-                                    channel: version.channel,
-                                    version: version.version,
-                                  })
-                                }
-                              >
-                                <PlayIcon data-icon="inline-start" />
-                                Activate
-                              </Button>
-                            ) : null}
-                            {!version.forcedPinned && version.pinned ? (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                disabled={pinMutation.isPending}
-                                onClick={() =>
-                                  pinMutation.mutate({ channel: version.channel, version: null })
-                                }
-                              >
-                                <PinOffIcon data-icon="inline-start" />
-                                Unpin
-                              </Button>
-                            ) : null}
-                            {!version.forcedPinned && !version.pinned ? (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                disabled={pinMutation.isPending}
-                                onClick={() =>
-                                  pinMutation.mutate({
-                                    channel: version.channel,
-                                    version: version.version,
-                                  })
-                                }
-                              >
-                                <PinIcon data-icon="inline-start" />
-                                Pin
-                              </Button>
-                            ) : null}
+                            <Button
+                              size="xs"
+                              variant={version.active ? "default" : "outline"}
+                              disabled={version.active || activateMutation.isPending}
+                              onClick={() =>
+                                activateMutation.mutate({
+                                  channel: version.channel,
+                                  version: version.version,
+                                })
+                              }
+                            >
+                              <PlayIcon data-icon="inline-start" />
+                              {version.active ? "Active" : "Activate"}
+                            </Button>
                             {version.source === "downloaded" &&
                             !version.active &&
                             !version.pinned ? (

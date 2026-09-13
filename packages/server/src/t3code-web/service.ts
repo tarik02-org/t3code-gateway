@@ -406,10 +406,6 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       return yield* storageFailure(`T3 Code ${channel} version ${version} is unavailable`);
     }
     yield* activateRoot(record.root);
-    yield* settings.update({
-      pinnedVersions: { [channel]: version },
-      updatedAt: DateTime.formatIso(yield* DateTime.now),
-    });
     return yield* status();
   });
 
@@ -512,12 +508,9 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       ),
     activateVersion: (channel: T3CodeWebChannel, version: string) =>
       activateVersion(channel, version).pipe(
-        Effect.catchTags({
-          DatabaseError: () =>
-            Effect.fail(storageFailure("Could not save the active T3 Code version")),
-          PlatformError: () =>
-            Effect.fail(storageFailure("Could not activate the T3 Code Web version")),
-        }),
+        Effect.catchTag("PlatformError", () =>
+          Effect.fail(storageFailure("Could not activate the T3 Code Web version")),
+        ),
       ),
     removeVersion: (channel: T3CodeWebChannel, version: string) =>
       removeVersion(channel, version).pipe(
