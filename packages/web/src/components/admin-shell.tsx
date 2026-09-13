@@ -373,13 +373,6 @@ function T3CodeUpdatesDialog({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Switch
-                      id="t3code-auto-gc"
-                      checked={autoGc}
-                      onCheckedChange={(checked) =>
-                        saveDraft(updateChannel, autoUpdate, checked, keepRecent)
-                      }
-                    />
                     <Button
                       size="xs"
                       variant="outline"
@@ -389,6 +382,13 @@ function T3CodeUpdatesDialog({
                       <Trash2Icon data-icon="inline-start" />
                       {gcMutation.isPending ? "Collecting..." : "GC now"}
                     </Button>
+                    <Switch
+                      id="t3code-auto-gc"
+                      checked={autoGc}
+                      onCheckedChange={(checked) =>
+                        saveDraft(updateChannel, autoUpdate, checked, keepRecent)
+                      }
+                    />
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-4 border-t pt-3">
@@ -399,11 +399,12 @@ function T3CodeUpdatesDialog({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col gap-2">
-                    <Label className="flex items-center gap-2 text-xs">
+                    <Label className="flex items-center justify-between gap-3 text-xs">
                       Stable
                       <Input
                         nativeInput
-                        className="w-16"
+                        className="w-28 text-sm"
+                        size="sm"
                         type="number"
                         min={0}
                         value={keepRecent.stable}
@@ -418,11 +419,12 @@ function T3CodeUpdatesDialog({
                         }}
                       />
                     </Label>
-                    <Label className="flex items-center gap-2 text-xs">
+                    <Label className="flex items-center justify-between gap-3 text-xs">
                       Nightly
                       <Input
                         nativeInput
-                        className="w-16"
+                        className="w-28 text-sm"
+                        size="sm"
                         type="number"
                         min={0}
                         value={keepRecent.nightly}
