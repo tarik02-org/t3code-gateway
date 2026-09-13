@@ -28,6 +28,7 @@ import { Label } from "./ui/label.tsx";
 import { Switch } from "./ui/switch.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
+import { toastManager } from "./ui/toast.tsx";
 import { T3Logo } from "./logo.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import {
@@ -120,12 +121,14 @@ function T3CodeUpdatesDialog({
     mutationFn: updateT3CodeWebSettings,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      setMessage("Update settings saved.");
       setError(null);
     },
     onError: (cause) => {
-      setMessage(null);
-      setError(cause instanceof Error ? cause.message : "Could not save update settings.");
+      toastManager.add({
+        type: "error",
+        title: "Could not save update settings",
+        description: cause instanceof Error ? cause.message : "The update settings were not saved.",
+      });
     },
   });
 
@@ -213,7 +216,6 @@ function T3CodeUpdatesDialog({
     setAutoUpdate(nextAutoUpdate);
     setAutoGc(nextAutoGc);
     setKeepRecent(nextKeepRecent);
-    setMessage("Saving...");
     setError(null);
     setUpdateResult(null);
     settingsMutation.mutate({
