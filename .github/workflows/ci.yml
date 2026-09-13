@@ -50,30 +50,6 @@ jobs:
 
       - run: pnpm build
 
-      - name: Setup Docker Buildx
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') ||
-          (github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          contains(github.event.pull_request.labels.*.name, 'build-image'))
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Download bundled T3 Code versions
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') ||
-          (github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          contains(github.event.pull_request.labels.*.name, 'build-image'))
-        run: pnpm download:t3code-web
-
-      - name: Prepare container runtime
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') ||
-          (github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          contains(github.event.pull_request.labels.*.name, 'build-image'))
-        run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
-
       - id: image
         name: Resolve image metadata
         if: >-
@@ -105,34 +81,13 @@ jobs:
             echo "artifact_name=$artifact_name"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Build PR container artifact
-        if: steps.image.outputs.artifact_kind == 'pr'
-        env:
-          VERSION: ${{ steps.image.outputs.version }}
-        run: >-
-          docker buildx build
-          --file Containerfile
-          --tag "t3code-gateway:${VERSION}"
-          --output "type=docker,dest=pr-image.tar"
-          .
-
-      - name: Upload PR container artifact
-        if: steps.image.outputs.artifact_kind == 'pr'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      - name: Build container artifact
+        if: steps.image.outputs.artifact_kind != ''
+        uses: ./.github/actions/container-build
         with:
-          name: ${{ steps.image.outputs.artifact_name }}
-          path: pr-image.tar
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload release runtime
-        if: steps.image.outputs.artifact_kind == 'release'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
-        with:
-          name: ${{ steps.image.outputs.artifact_name }}
-          path: packaging/runtime/app
-          if-no-files-found: error
-          retention-days: 1
+          artifact-kind: ${{ steps.image.outputs.artifact_kind }}
+          artifact-name: ${{ steps.image.outputs.artifact_name }}
+          version: ${{ steps.image.outputs.version }}
 
   publish:
     name: Publish release image
