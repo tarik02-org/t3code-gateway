@@ -73,7 +73,7 @@ export function EnvironmentPage() {
     currentUserQuery.data === undefined
   ) {
     return (
-      <AdminShell>
+      <AdminShell t3codeWeb={undefined}>
         <EnvironmentTableSkeleton showWebColumn={false} />
       </AdminShell>
     );
@@ -81,6 +81,7 @@ export function EnvironmentPage() {
 
   return (
     <AdminShell
+      t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}
       actions={
         <Button size="xs" type="button" onClick={() => openAddDialog(true)}>
           <PlusIcon data-icon="inline-start" />

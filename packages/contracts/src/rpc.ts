@@ -5,6 +5,10 @@ import { GatewaySessionMiddleware } from "./gateway-session.ts";
 import {
   AuthFailure,
   ChangePasswordRequest,
+  CheckT3CodeWebUpdatesRequest,
+  InstallT3CodeWebReleaseRequest,
+  SetT3CodeWebVersionPinRequest,
+  T3CodeWebVersionRequest,
   CreateEnvironmentPairingLinkRequest,
   CurrentUser,
   EnvironmentClientSession,
@@ -16,6 +20,9 @@ import {
   RevokeEnvironmentClientResponse,
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
+  T3CodeWebFailure,
+  T3CodeWebRelease,
+  UpdateT3CodeWebSettingsRequest,
   TraefikConfigResponse,
   UpdateEnvironmentRequest,
   ValidateEnvironmentResponse,
@@ -61,6 +68,52 @@ export const RevokeEnvironmentClientPayload = Schema.Struct({
 });
 
 export type RevokeEnvironmentClientPayload = typeof RevokeEnvironmentClientPayload.Type;
+
+export class UpdateT3CodeWebSettings extends Rpc.make("gateway.t3codeWeb.settings.update", {
+  payload: UpdateT3CodeWebSettingsRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class CheckT3CodeWebUpdates extends Rpc.make("gateway.t3codeWeb.updates.check", {
+  payload: CheckT3CodeWebUpdatesRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class ListT3CodeWebReleases extends Rpc.make("gateway.t3codeWeb.releases.list", {
+  success: Schema.Array(T3CodeWebRelease),
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class InstallT3CodeWebRelease extends Rpc.make("gateway.t3codeWeb.releases.install", {
+  payload: InstallT3CodeWebReleaseRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class ActivateT3CodeWebVersion extends Rpc.make("gateway.t3codeWeb.versions.activate", {
+  payload: T3CodeWebVersionRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class RemoveT3CodeWebVersion extends Rpc.make("gateway.t3codeWeb.versions.remove", {
+  payload: T3CodeWebVersionRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class SetT3CodeWebVersionPin extends Rpc.make("gateway.t3codeWeb.versions.pin", {
+  payload: SetT3CodeWebVersionPinRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class GarbageCollectT3CodeWebVersions extends Rpc.make("gateway.t3codeWeb.versions.gc", {
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
 
 export class GetCurrentUser extends Rpc.make("gateway.auth.me", {
   success: Schema.NullOr(CurrentUser),
@@ -159,4 +212,12 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateT3CodeCatalogEntry,
   RevokeEnvironmentClient,
   GetTraefikConfig,
+  UpdateT3CodeWebSettings,
+  CheckT3CodeWebUpdates,
+  ListT3CodeWebReleases,
+  InstallT3CodeWebRelease,
+  ActivateT3CodeWebVersion,
+  RemoveT3CodeWebVersion,
+  SetT3CodeWebVersionPin,
+  GarbageCollectT3CodeWebVersions,
 ) {}

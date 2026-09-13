@@ -19,6 +19,7 @@ import { configLayer, GatewayRuntimeConfig } from "../config.ts";
 import { GatewayDatabase, layer as gatewayDatabaseLayer } from "../db/database.ts";
 import { layer as authRepositoryLayer } from "../db/auth-repository.ts";
 import { layer as environmentRepositoryLayer } from "../db/environment-repository.ts";
+import { SettingsRepositoryLive } from "../db/settings-repository.ts";
 import {
   AdminTokenRotation,
   AdminTokenRotationLive,
@@ -35,6 +36,7 @@ import { layer as traefikRoutesLayer } from "./traefik-routes.ts";
 import { sessionGuard } from "./session-guard.ts";
 import { layer as authLayer } from "../auth/service.ts";
 import { layer as traefikReconcilerLayer, TraefikReconciler } from "../traefik/reconciler.ts";
+import { T3CodeWebService, T3CodeWebServiceLive } from "../t3code-web/service.ts";
 
 const foundationLayer = Layer.mergeAll(
   configLayer,
@@ -50,6 +52,8 @@ const authRepositoryLiveLayer = authRepositoryLayer.pipe(Layer.provide(databaseL
 const environmentRepositoryLiveLayer = environmentRepositoryLayer.pipe(
   Layer.provide(databaseLiveLayer),
 );
+
+const settingsRepositoryLiveLayer = SettingsRepositoryLive.pipe(Layer.provide(databaseLiveLayer));
 
 const authLiveLayer = authLayer.pipe(
   Layer.provide(authRepositoryLiveLayer),
@@ -73,6 +77,12 @@ const environmentLiveLayer = environmentServiceLayer.pipe(
   Layer.provide(foundationLayer),
 );
 
+const t3codeWebLiveLayer = T3CodeWebServiceLive.pipe(
+  Layer.provide(settingsRepositoryLiveLayer),
+  Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(foundationLayer),
+);
+
 const traefikLiveLayer = traefikReconcilerLayer.pipe(
   Layer.provide(environmentLiveLayer),
   Layer.provide(foundationLayer),
@@ -82,6 +92,21 @@ const bootstrapLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const database = yield* GatewayDatabase;
     yield* database.runMigrations;
+    const t3codeWeb = yield* T3CodeWebService;
+    yield* t3codeWeb.initialize;
+    yield* t3codeWeb.runAutomaticUpdate.pipe(
+      Effect.catchTag("T3CodeWebFailure", (error) =>
+        Effect.logWarning(`T3 Code update check failed: ${error.message}`),
+      ),
+      Effect.forkScoped({ startImmediately: true }),
+    );
+    yield* t3codeWeb.runAutomaticUpdate.pipe(
+      Effect.catchTag("T3CodeWebFailure", (error) =>
+        Effect.logWarning(`T3 Code update check failed: ${error.message}`),
+      ),
+      Effect.repeat(Schedule.spaced("6 hours")),
+      Effect.forkScoped({ startImmediately: false }),
+    );
     const auth = yield* AuthService;
     yield* auth.bootstrapFirstUser();
     const traefik = yield* TraefikReconciler;
@@ -117,6 +142,8 @@ const routesLayer = Layer.mergeAll(
   Layer.provideMerge(environmentLiveLayer),
   Layer.provideMerge(authLiveLayer),
   Layer.provideMerge(environmentRepositoryLiveLayer),
+  Layer.provideMerge(settingsRepositoryLiveLayer),
+  Layer.provideMerge(t3codeWebLiveLayer),
   Layer.provideMerge(authRepositoryLiveLayer),
   Layer.provideMerge(databaseLiveLayer),
   Layer.provideMerge(foundationLayer),
@@ -183,6 +210,8 @@ export const runtimeLayer = serveLayer.pipe(
   Layer.provideMerge(databaseLiveLayer),
   Layer.provideMerge(authRepositoryLiveLayer),
   Layer.provideMerge(environmentRepositoryLiveLayer),
+  Layer.provideMerge(settingsRepositoryLiveLayer),
+  Layer.provideMerge(t3codeWebLiveLayer),
   Layer.provideMerge(authLiveLayer),
   Layer.provideMerge(environmentLiveLayer),
   Layer.provideMerge(traefikLiveLayer),

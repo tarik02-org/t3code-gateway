@@ -22,6 +22,6 @@ mkdir -p "${app_dir}/packages/web/dist"
 cp -R "${root_dir}/packages/web/dist/client" "${app_dir}/packages/web/dist/client"
 
 if [ -n "${t3code_web_dist}" ]; then
-  test -f "${t3code_web_dist}/index.html"
+  test -f "${t3code_web_dist}/stable/index.html"
   cp -R "${t3code_web_dist}" "${app_dir}/t3code-web-dist"
 fi

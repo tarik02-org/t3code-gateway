@@ -28,7 +28,13 @@ export const GatewayConfig = Config.all({
   adminStaticRoot: Config.string("T3_GATEWAY_ADMIN_STATIC_ROOT").pipe(Config.option),
   t3codeWebEnabled: Config.boolean("T3_GATEWAY_T3CODE_WEB_ENABLED").pipe(Config.withDefault(true)),
   t3codeWebStaticRoot: Config.string("T3_GATEWAY_T3CODE_WEB_STATIC_ROOT").pipe(Config.option),
-  t3codeWebBuildId: Config.string("T3_GATEWAY_T3CODE_WEB_BUILD_ID").pipe(Config.option),
+  t3codeWebBundledRoot: Config.string("T3_GATEWAY_T3CODE_WEB_BUNDLED_ROOT").pipe(Config.option),
+  t3codeWebDataRoot: Config.string("T3_GATEWAY_T3CODE_WEB_DATA_ROOT").pipe(
+    Config.withDefault("/data/t3code-web"),
+  ),
+  t3codeWebRepository: Config.string("T3_GATEWAY_T3CODE_WEB_REPOSITORY").pipe(
+    Config.withDefault("tarik02-org/t3code"),
+  ),
 });
 
 export type GatewayConfig = Config.Success<typeof GatewayConfig>;

@@ -1,18 +1,106 @@
 import * as Schema from "effect/Schema";
 
+export const T3CodeWebVersionSource = Schema.Literals(["bundled", "downloaded"]);
+const T3CodeWebRetentionCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+export type T3CodeWebVersionSource = typeof T3CodeWebVersionSource.Type;
+
+export const T3CodeWebVersion = Schema.Struct({
+  channel: Schema.Literals(["stable", "nightly"]),
+  version: Schema.String,
+  source: T3CodeWebVersionSource,
+  active: Schema.Boolean,
+  pinned: Schema.Boolean,
+  forcedPinned: Schema.Boolean,
+});
+
+export type T3CodeWebVersion = typeof T3CodeWebVersion.Type;
+
+export const T3CodeWebRelease = Schema.Struct({
+  channel: Schema.Literals(["stable", "nightly"]),
+  version: Schema.String,
+  installed: Schema.Boolean,
+});
+
+export type T3CodeWebRelease = typeof T3CodeWebRelease.Type;
+
+export const T3CodeWebStatus = Schema.Struct({
+  available: Schema.Boolean,
+  updateChannel: Schema.Literals(["stable", "nightly"]),
+  autoUpdate: Schema.Boolean,
+  autoGc: Schema.Boolean,
+  keepRecent: Schema.Struct({
+    stable: T3CodeWebRetentionCount,
+    nightly: T3CodeWebRetentionCount,
+  }),
+  versions: Schema.Array(T3CodeWebVersion),
+});
+
+export type T3CodeWebStatus = typeof T3CodeWebStatus.Type;
+
 export const GatewayStatus = Schema.Struct({
   ok: Schema.Boolean,
   version: Schema.String,
   database: Schema.Struct({
     migrated: Schema.Boolean,
   }),
-  t3codeWeb: Schema.Struct({
-    available: Schema.Boolean,
-    buildId: Schema.optional(Schema.String),
-  }),
+  t3codeWeb: T3CodeWebStatus,
 });
 
 export type GatewayStatus = typeof GatewayStatus.Type;
+
+export const T3CodeWebChannel = Schema.Literals(["stable", "nightly"]);
+
+export type T3CodeWebChannel = typeof T3CodeWebChannel.Type;
+
+export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
+  updateChannel: Schema.optional(T3CodeWebChannel),
+  autoUpdate: Schema.optional(Schema.Boolean),
+  autoGc: Schema.optional(Schema.Boolean),
+  keepRecent: Schema.optional(
+    Schema.Struct({
+      stable: T3CodeWebRetentionCount,
+      nightly: T3CodeWebRetentionCount,
+    }),
+  ),
+});
+
+export type UpdateT3CodeWebSettingsRequest = typeof UpdateT3CodeWebSettingsRequest.Type;
+
+export const CheckT3CodeWebUpdatesRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+});
+
+export type CheckT3CodeWebUpdatesRequest = typeof CheckT3CodeWebUpdatesRequest.Type;
+
+export const T3CodeWebVersionRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.String,
+});
+
+export type T3CodeWebVersionRequest = typeof T3CodeWebVersionRequest.Type;
+
+export const SetT3CodeWebVersionPinRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.NullOr(Schema.String),
+});
+
+export type SetT3CodeWebVersionPinRequest = typeof SetT3CodeWebVersionPinRequest.Type;
+
+export const InstallT3CodeWebReleaseRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.String,
+});
+
+export type InstallT3CodeWebReleaseRequest = typeof InstallT3CodeWebReleaseRequest.Type;
+
+export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
+  "T3CodeWebFailure",
+  {
+    message: Schema.String,
+    status: Schema.optional(Schema.Number),
+  },
+) {}
 
 export const LoginRequest = Schema.Struct({
   username: Schema.String,

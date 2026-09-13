@@ -11,6 +11,7 @@ const DatabaseOperation = Schema.Literals([
   "authSession",
   "authUser",
   "environment",
+  "settings",
 ]);
 
 type DatabaseOperation = typeof DatabaseOperation.Type;

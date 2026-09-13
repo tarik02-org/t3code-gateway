@@ -20,6 +20,7 @@ import * as Layer from "effect/Layer";
 import { AuthService } from "../auth/service.ts";
 import type { DatabaseError } from "../db/errors.ts";
 import { EnvironmentService } from "../environments/service.ts";
+import { T3CodeWebService } from "../t3code-web/service.ts";
 import { TraefikReconciler } from "../traefik/reconciler.ts";
 import { buildGatewayStatus } from "./status.ts";
 import { layer as gatewaySessionMiddlewareLayer } from "./gateway-session-middleware.ts";
@@ -39,6 +40,7 @@ export const layer = GatewayRpcs.toLayer(
     const auth = yield* AuthService;
     const environments = yield* EnvironmentService;
     const traefik = yield* TraefikReconciler;
+    const t3codeWeb = yield* T3CodeWebService;
 
     return GatewayRpcs.of({
       "gateway.auth.me": () =>
@@ -58,7 +60,54 @@ export const layer = GatewayRpcs.toLayer(
           }),
         ),
 
-      "gateway.status": () => buildGatewayStatus,
+      "gateway.status": () => buildGatewayStatus().pipe(Effect.orDie),
+
+      "gateway.t3codeWeb.settings.update": (payload) =>
+        t3codeWeb.updateSettings(payload).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.updates.check": (payload) =>
+        t3codeWeb.checkForUpdates(payload.channel).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.releases.list": () =>
+        t3codeWeb.listReleases.pipe(
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.releases.install": (payload) =>
+        t3codeWeb.installRelease(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.activate": (payload) =>
+        t3codeWeb.activateVersion(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.remove": (payload) =>
+        t3codeWeb.removeVersion(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.pin": (payload) =>
+        t3codeWeb.setVersionPin(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.gc": () =>
+        t3codeWeb.garbageCollect.pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
 
       "gateway.environments.list": () =>
         environments.list().pipe(Effect.catchTags(environmentRpcDatabaseErrors)),

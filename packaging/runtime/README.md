@@ -7,4 +7,5 @@ Required layout:
 
 Optional layout:
 
-- `t3code-web-dist/index.html`
+- `t3code-web-dist/stable/index.html`
+- `t3code-web-dist/nightly/index.html`

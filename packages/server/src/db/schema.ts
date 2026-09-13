@@ -1,5 +1,11 @@
 import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const gatewaySettings = sqliteTable("gateway_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),

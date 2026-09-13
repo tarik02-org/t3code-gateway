@@ -1,5 +1,6 @@
 import type {
   ChangePasswordRequest,
+  CheckT3CodeWebUpdatesRequest,
   CreateEnvironmentPairingLinkRequest,
   CurrentUser,
   EnvironmentClientSession,
@@ -7,12 +8,17 @@ import type {
   EnvironmentPairingLink,
   EnvironmentRecord,
   GatewayStatus,
+  InstallT3CodeWebReleaseRequest,
   LoginRequest,
   LoginResponse,
   RevokeEnvironmentClientResponse,
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
+  T3CodeWebRelease,
   TraefikConfigResponse,
+  UpdateT3CodeWebSettingsRequest,
+  SetT3CodeWebVersionPinRequest,
+  T3CodeWebVersionRequest,
   UpdateEnvironmentRequest,
   ValidateEnvironmentResponse,
 } from "@t3code-gateway/contracts/schemas";
@@ -66,6 +72,50 @@ export async function changePassword(payload: ChangePasswordRequest): Promise<vo
 
 export async function getGatewayStatus(): Promise<GatewayStatus> {
   return runGatewayRpc((client) => client["gateway.status"](undefined));
+}
+
+export async function updateT3CodeWebSettings(
+  payload: UpdateT3CodeWebSettingsRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.settings.update"](payload));
+}
+
+export async function checkT3CodeWebUpdates(
+  payload: CheckT3CodeWebUpdatesRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.updates.check"](payload));
+}
+
+export async function listT3CodeWebReleases(): Promise<ReadonlyArray<T3CodeWebRelease>> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.releases.list"](undefined));
+}
+
+export async function installT3CodeWebRelease(
+  payload: InstallT3CodeWebReleaseRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.releases.install"](payload));
+}
+
+export async function activateT3CodeWebVersion(
+  payload: T3CodeWebVersionRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.activate"](payload));
+}
+
+export async function removeT3CodeWebVersion(
+  payload: T3CodeWebVersionRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.remove"](payload));
+}
+
+export async function setT3CodeWebVersionPin(
+  payload: SetT3CodeWebVersionPinRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.pin"](payload));
+}
+
+export async function garbageCollectT3CodeWebVersions(): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.gc"](undefined));
 }
 
 export async function getTraefikConfig(): Promise<TraefikConfigResponse> {
