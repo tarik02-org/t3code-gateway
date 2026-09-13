@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLinkIcon, PlayIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  MinusIcon,
+  PlayIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
@@ -399,46 +406,26 @@ function T3CodeUpdatesDialog({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col gap-2">
-                    <Label className="flex items-center justify-between gap-3 text-xs">
-                      Stable
-                      <Input
-                        nativeInput
-                        className="w-28 text-sm"
-                        size="sm"
-                        type="number"
-                        min={0}
-                        value={keepRecent.stable}
-                        onChange={(event) => {
-                          const value = Number(event.target.value);
-                          if (Number.isInteger(value) && value >= 0) {
-                            saveDraft(updateChannel, autoUpdate, autoGc, {
-                              ...keepRecent,
-                              stable: value,
-                            });
-                          }
-                        }}
-                      />
-                    </Label>
-                    <Label className="flex items-center justify-between gap-3 text-xs">
-                      Nightly
-                      <Input
-                        nativeInput
-                        className="w-28 text-sm"
-                        size="sm"
-                        type="number"
-                        min={0}
-                        value={keepRecent.nightly}
-                        onChange={(event) => {
-                          const value = Number(event.target.value);
-                          if (Number.isInteger(value) && value >= 0) {
-                            saveDraft(updateChannel, autoUpdate, autoGc, {
-                              ...keepRecent,
-                              nightly: value,
-                            });
-                          }
-                        }}
-                      />
-                    </Label>
+                    <RetentionInput
+                      label="Stable"
+                      value={keepRecent.stable}
+                      onChange={(value) =>
+                        saveDraft(updateChannel, autoUpdate, autoGc, {
+                          ...keepRecent,
+                          stable: value,
+                        })
+                      }
+                    />
+                    <RetentionInput
+                      label="Nightly"
+                      value={keepRecent.nightly}
+                      onChange={(value) =>
+                        saveDraft(updateChannel, autoUpdate, autoGc, {
+                          ...keepRecent,
+                          nightly: value,
+                        })
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -494,6 +481,59 @@ function T3CodeUpdatesDialog({
         }}
       />
     </>
+  );
+}
+
+function RetentionInput({
+  label,
+  value,
+  onChange,
+}: Readonly<{
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}>) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <span className="min-w-16">{label}</span>
+      <div className="flex items-center rounded-md border border-input bg-background">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 rounded-none"
+          aria-label={`Decrease ${label} retention`}
+          disabled={value === 0}
+          onClick={() => onChange(Math.max(0, value - 1))}
+        >
+          <MinusIcon />
+        </Button>
+        <Input
+          nativeInput
+          unstyled
+          size="sm"
+          type="text"
+          inputMode="numeric"
+          className="w-16 text-center text-sm"
+          value={String(value)}
+          aria-label={`${label} versions to keep`}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isInteger(next) && next >= 0) {
+              onChange(next);
+            }
+          }}
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 rounded-none"
+          aria-label={`Increase ${label} retention`}
+          onClick={() => onChange(value + 1)}
+        >
+          <PlusIcon />
+        </Button>
+      </div>
+    </div>
   );
 }
 
