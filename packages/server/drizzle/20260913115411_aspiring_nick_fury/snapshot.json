@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ce57884f-f5b1-49b4-8fbb-af70301699e0",
+  "id": "d9add52f-96fc-4dfd-b0d7-62d7c4605b8a",
   "prevIds": ["e6aff721-bf17-4f1e-9c91-7f156d8a9d42"],
   "ddl": [
     {
@@ -151,12 +151,12 @@
       "table": "environments"
     },
     {
-      "type": "integer",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
-      "name": "id",
+      "name": "key",
       "entityType": "columns",
       "table": "gateway_settings"
     },
@@ -164,19 +164,9 @@
       "type": "text",
       "notNull": true,
       "autoincrement": false,
-      "default": "'nightly'",
+      "default": null,
       "generated": null,
-      "name": "t3code_web_channel",
-      "entityType": "columns",
-      "table": "gateway_settings"
-    },
-    {
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "name": "t3code_web_auto_update",
+      "name": "value",
       "entityType": "columns",
       "table": "gateway_settings"
     },
@@ -319,7 +309,7 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": ["key"],
       "nameExplicit": false,
       "name": "gateway_settings_pk",
       "table": "gateway_settings",

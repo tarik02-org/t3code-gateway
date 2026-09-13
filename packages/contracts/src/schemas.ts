@@ -34,6 +34,12 @@ export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
 
 export type UpdateT3CodeWebSettingsRequest = typeof UpdateT3CodeWebSettingsRequest.Type;
 
+export const CheckT3CodeWebUpdatesRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+});
+
+export type CheckT3CodeWebUpdatesRequest = typeof CheckT3CodeWebUpdatesRequest.Type;
+
 export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
   "T3CodeWebFailure",
   {

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings2Icon } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
@@ -21,7 +21,11 @@ import { Label } from "./ui/label.tsx";
 import { Switch } from "./ui/switch.tsx";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
 import { T3Logo } from "./logo.tsx";
-import { changePassword, updateT3CodeWebSettings } from "../lib/gateway-api.ts";
+import {
+  changePassword,
+  checkT3CodeWebUpdates,
+  updateT3CodeWebSettings,
+} from "../lib/gateway-api.ts";
 import { GATEWAY_STATUS_QUERY_KEY } from "../features/environments/query-keys.ts";
 
 export function AdminShell({
@@ -34,7 +38,7 @@ export function AdminShell({
   t3codeWeb: GatewayStatus["t3codeWeb"] | undefined;
 }>) {
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updatesOpen, setUpdatesOpen] = useState(false);
 
   return (
     <main className="flex h-dvh flex-col text-foreground">
@@ -49,9 +53,9 @@ export function AdminShell({
           Reset password
         </Button>
         {t3codeWeb?.available === true ? (
-          <Button size="xs" variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Settings2Icon data-icon="inline-start" />
-            T3 Code
+          <Button size="xs" variant="outline" onClick={() => setUpdatesOpen(true)}>
+            <RefreshCwIcon data-icon="inline-start" />
+            T3 Code updates
           </Button>
         ) : null}
         {actions}
@@ -62,16 +66,12 @@ export function AdminShell({
         </div>
       </div>
       <ResetPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
-      <T3CodeSettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        settings={t3codeWeb}
-      />
+      <T3CodeUpdatesDialog open={updatesOpen} onOpenChange={setUpdatesOpen} settings={t3codeWeb} />
     </main>
   );
 }
 
-function T3CodeSettingsDialog({
+function T3CodeUpdatesDialog({
   open,
   onOpenChange,
   settings,
@@ -83,19 +83,42 @@ function T3CodeSettingsDialog({
   const queryClient = useQueryClient();
   const [channel, setChannel] = useState<T3CodeWebChannel>("nightly");
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const mutation = useMutation({
+  const settingsMutation = useMutation({
     mutationFn: updateT3CodeWebSettings,
     onSuccess: (nextStatus) => {
       queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
+      setMessage("Update settings saved.");
       setError(null);
-      onOpenChange(false);
     },
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not save T3 Code settings.");
+      setMessage(null);
+      setError(cause instanceof Error ? cause.message : "Could not save update settings.");
     },
   });
+
+  const checkMutation = useMutation({
+    mutationFn: checkT3CodeWebUpdates,
+    onSuccess: (nextStatus) => {
+      queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
+      setMessage("Update check complete.");
+      setError(null);
+    },
+    onError: (cause) => {
+      setMessage(null);
+      setError(cause instanceof Error ? cause.message : "Could not check for updates.");
+    },
+  });
+
+  const saveDraft = (nextChannel: T3CodeWebChannel, nextAutoUpdate: boolean) => {
+    setChannel(nextChannel);
+    setAutoUpdate(nextAutoUpdate);
+    setMessage("Saving...");
+    setError(null);
+    settingsMutation.mutate({ channel: nextChannel, autoUpdate: nextAutoUpdate });
+  };
 
   return (
     <Dialog
@@ -104,14 +127,18 @@ function T3CodeSettingsDialog({
         if (nextOpen && settings !== undefined) {
           setChannel(settings.channel);
           setAutoUpdate(settings.autoUpdate);
+          setMessage(null);
+          setError(null);
         }
         onOpenChange(nextOpen);
       }}
     >
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>T3 Code settings</DialogTitle>
-          <DialogDescription>Choose which bundled channel the gateway serves.</DialogDescription>
+          <DialogTitle>T3 Code updates</DialogTitle>
+          <DialogDescription>
+            Choose a channel, save changes automatically, or update it immediately.
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <div className="flex flex-col gap-5">
@@ -123,10 +150,10 @@ function T3CodeSettingsDialog({
                 value={channel}
                 onValueChange={(value) => {
                   if (value === "stable" || value === "nightly") {
-                    setChannel(value);
+                    saveDraft(value, autoUpdate);
                   }
                 }}
-                aria-label="T3 Code channel"
+                aria-label="T3 Code update channel"
               >
                 <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
                 <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
@@ -150,9 +177,10 @@ function T3CodeSettingsDialog({
               <Switch
                 id="t3code-auto-update"
                 checked={autoUpdate}
-                onCheckedChange={setAutoUpdate}
+                onCheckedChange={(checked) => saveDraft(channel, checked)}
               />
             </div>
+            {message !== null ? <p className="text-xs text-success-foreground">{message}</p> : null}
             {error !== null ? <p className="text-xs text-destructive-foreground">{error}</p> : null}
           </div>
         </DialogPanel>
@@ -160,10 +188,11 @@ function T3CodeSettingsDialog({
           <Button
             size="xs"
             type="button"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ channel, autoUpdate })}
+            disabled={checkMutation.isPending}
+            onClick={() => checkMutation.mutate({ channel })}
           >
-            {mutation.isPending ? "Saving..." : "Save settings"}
+            <RefreshCwIcon data-icon="inline-start" />
+            {checkMutation.isPending ? "Checking..." : "Check for updates"}
           </Button>
         </DialogFooter>
       </DialogPopup>

@@ -4,19 +4,26 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
-import type { T3CodeWebChannel as T3CodeWebChannelType } from "@t3code-gateway/contracts/schemas";
+import {
+  T3CodeWebChannel,
+  type T3CodeWebChannel as T3CodeWebChannelType,
+} from "@t3code-gateway/contracts/schemas";
 
 import { GatewayDatabase } from "./database.ts";
 import { DatabaseError, queryError } from "./errors.ts";
 import { gatewaySettings } from "./schema.ts";
 
-const StoredGatewaySettings = Schema.Struct({
-  id: Schema.Number,
-  t3codeWebChannel: T3CodeWebChannel,
-  t3codeWebAutoUpdate: Schema.Boolean,
+const CHANNEL_KEY = "t3code.web.channel";
+const AUTO_UPDATE_KEY = "t3code.web.autoUpdate";
+
+const StoredGatewaySetting = Schema.Struct({
+  key: Schema.String,
+  value: Schema.String,
   updatedAt: Schema.String,
 });
+
+const StoredGatewaySettings = Schema.Array(StoredGatewaySetting);
+const StoredAutoUpdate = Schema.Literals(["true", "false"]);
 
 export type GatewaySettings = {
   readonly channel: T3CodeWebChannelType;
@@ -24,16 +31,30 @@ export type GatewaySettings = {
   readonly updatedAt: string;
 };
 
-const decodeGatewaySettings = (row: unknown) =>
-  Schema.decodeUnknownEffect(StoredGatewaySettings)(row).pipe(
-    Effect.map((settings) => ({
-      channel: settings.t3codeWebChannel,
-      autoUpdate: settings.t3codeWebAutoUpdate,
-      updatedAt: settings.updatedAt,
-    })),
-    Effect.catchTag("SchemaError", () =>
-      Effect.fail(new DatabaseError({ operation: "settings", reason: "invalidData" })),
-    ),
+const invalidSettings = () =>
+  Effect.fail(new DatabaseError({ operation: "settings", reason: "invalidData" }));
+
+const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, DatabaseError> =>
+  Schema.decodeUnknownEffect(StoredGatewaySettings)(rows).pipe(
+    Effect.flatMap((settings) => {
+      const channel = settings.find((setting) => setting.key === CHANNEL_KEY);
+      const autoUpdate = settings.find((setting) => setting.key === AUTO_UPDATE_KEY);
+      if (channel === undefined || autoUpdate === undefined) {
+        return invalidSettings();
+      }
+      return Schema.decodeUnknownEffect(
+        Schema.Struct({ channel: T3CodeWebChannel, autoUpdate: StoredAutoUpdate }),
+      )({ channel: channel.value, autoUpdate: autoUpdate.value }).pipe(
+        Effect.map((decoded) => ({
+          channel: decoded.channel,
+          autoUpdate: decoded.autoUpdate === "true",
+          updatedAt:
+            channel.updatedAt > autoUpdate.updatedAt ? channel.updatedAt : autoUpdate.updatedAt,
+        })),
+        Effect.catchTag("SchemaError", () => invalidSettings()),
+      );
+    }),
+    Effect.catchTag("SchemaError", () => invalidSettings()),
   );
 
 export class SettingsRepository extends Context.Service<
@@ -54,39 +75,41 @@ export const make = Effect.gen(function* () {
   const read = db
     .select()
     .from(gatewaySettings)
-    .where(eq(gatewaySettings.id, 1))
-    .get()
+    .all()
     .pipe(
-      Effect.flatMap((row) =>
-        row === undefined
-          ? Effect.fail(new DatabaseError({ operation: "settings", reason: "notFound" }))
-          : decodeGatewaySettings(row),
-      ),
+      Effect.flatMap(decodeGatewaySettings),
       Effect.catchTags({
         EffectDrizzleQueryError: (error) => queryError("settings", error),
       }),
     );
+
+  const updateKey = (key: string, value: string, updatedAt: string) =>
+    db
+      .update(gatewaySettings)
+      .set({ value, updatedAt })
+      .where(eq(gatewaySettings.key, key))
+      .run()
+      .pipe(
+        Effect.asVoid,
+        Effect.catchTags({
+          EffectDrizzleQueryError: (error) => queryError("settings", error),
+        }),
+      );
 
   const update = (
     input: Partial<Pick<GatewaySettings, "channel" | "autoUpdate">> & {
       readonly updatedAt: string;
     },
   ) =>
-    db
-      .update(gatewaySettings)
-      .set({
-        ...(input.channel === undefined ? {} : { t3codeWebChannel: input.channel }),
-        ...(input.autoUpdate === undefined ? {} : { t3codeWebAutoUpdate: input.autoUpdate }),
-        updatedAt: input.updatedAt,
-      })
-      .where(eq(gatewaySettings.id, 1))
-      .run()
-      .pipe(
-        Effect.flatMap(() => read),
-        Effect.catchTags({
-          EffectDrizzleQueryError: (error) => queryError("settings", error),
-        }),
-      );
+    Effect.gen(function* () {
+      if (input.channel !== undefined) {
+        yield* updateKey(CHANNEL_KEY, input.channel, input.updatedAt);
+      }
+      if (input.autoUpdate !== undefined) {
+        yield* updateKey(AUTO_UPDATE_KEY, String(input.autoUpdate), input.updatedAt);
+      }
+      return yield* read;
+    });
 
   return SettingsRepository.of({ get: read, update });
 });

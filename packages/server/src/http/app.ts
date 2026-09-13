@@ -94,13 +94,13 @@ const bootstrapLayer = Layer.effectDiscard(
     yield* database.runMigrations;
     const t3codeWeb = yield* T3CodeWebService;
     yield* t3codeWeb.initialize;
-    yield* t3codeWeb.checkForUpdates.pipe(
+    yield* t3codeWeb.runAutomaticUpdate.pipe(
       Effect.catchTag("T3CodeWebFailure", (error) =>
         Effect.logWarning(`T3 Code update check failed: ${error.message}`),
       ),
       Effect.forkScoped({ startImmediately: true }),
     );
-    yield* t3codeWeb.checkForUpdates.pipe(
+    yield* t3codeWeb.runAutomaticUpdate.pipe(
       Effect.catchTag("T3CodeWebFailure", (error) =>
         Effect.logWarning(`T3 Code update check failed: ${error.message}`),
       ),

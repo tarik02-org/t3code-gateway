@@ -80,7 +80,10 @@ export class T3CodeWebService extends Context.Service<
     readonly updateSettings: (
       input: UpdateT3CodeWebSettingsRequest,
     ) => Effect.Effect<GatewayStatus["t3codeWeb"], T3CodeWebFailure>;
-    readonly checkForUpdates: Effect.Effect<void, T3CodeWebFailure>;
+    readonly checkForUpdates: (
+      channel: T3CodeWebChannel,
+    ) => Effect.Effect<GatewayStatus["t3codeWeb"], T3CodeWebFailure>;
+    readonly runAutomaticUpdate: Effect.Effect<void, T3CodeWebFailure>;
   }
 >()("@t3code-gateway/server/t3code-web/service/T3CodeWebService") {}
 
@@ -293,10 +296,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     yield* fs.writeFileString(path.join(temporary, "version.txt"), release.version);
     yield* fs.remove(target, { recursive: true, force: true });
     yield* fs.rename(temporary, target);
-    const currentSettings = yield* readSettings;
-    if (currentSettings.channel === channel) {
-      yield* activate(channel);
-    }
+    yield* activate(channel);
   });
 
   const updateSettings = Effect.fn("T3CodeWebService.updateSettings")(function* (
@@ -341,14 +341,21 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     return yield* status();
   });
 
-  const checkForUpdates = Effect.fn("T3CodeWebService.checkForUpdates")(function* () {
+  const checkForUpdates = Effect.fn("T3CodeWebService.checkForUpdates")(function* (
+    channel: T3CodeWebChannel,
+  ) {
+    yield* download(channel).pipe(
+      Effect.catchTag("PlatformError", () =>
+        Effect.fail(storageFailure("Could not install the T3 Code Web update")),
+      ),
+    );
+    return yield* status();
+  });
+
+  const runAutomaticUpdate = Effect.fn("T3CodeWebService.runAutomaticUpdate")(function* () {
     const current = yield* readSettings;
     if (current.autoUpdate) {
-      yield* download(current.channel).pipe(
-        Effect.catchTag("PlatformError", () =>
-          Effect.fail(storageFailure("Could not install the T3 Code Web update")),
-        ),
-      );
+      yield* checkForUpdates(current.channel);
     }
   });
 
@@ -356,7 +363,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     initialize: initialize(),
     status: status(),
     updateSettings,
-    checkForUpdates: checkForUpdates(),
+    checkForUpdates,
+    runAutomaticUpdate: runAutomaticUpdate(),
   };
 });
 

@@ -5,6 +5,7 @@ import { GatewaySessionMiddleware } from "./gateway-session.ts";
 import {
   AuthFailure,
   ChangePasswordRequest,
+  CheckT3CodeWebUpdatesRequest,
   CreateEnvironmentPairingLinkRequest,
   CurrentUser,
   EnvironmentClientSession,
@@ -66,6 +67,12 @@ export type RevokeEnvironmentClientPayload = typeof RevokeEnvironmentClientPaylo
 
 export class UpdateT3CodeWebSettings extends Rpc.make("gateway.t3codeWeb.settings.update", {
   payload: UpdateT3CodeWebSettingsRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class CheckT3CodeWebUpdates extends Rpc.make("gateway.t3codeWeb.updates.check", {
+  payload: CheckT3CodeWebUpdatesRequest,
   success: GatewayStatus,
   error: T3CodeWebFailure,
 }).middleware(GatewaySessionMiddleware) {}
@@ -168,4 +175,5 @@ export class GatewayRpcs extends RpcGroup.make(
   RevokeEnvironmentClient,
   GetTraefikConfig,
   UpdateT3CodeWebSettings,
+  CheckT3CodeWebUpdates,
 ) {}
