@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLinkIcon,
   MinusIcon,
@@ -36,6 +36,8 @@ import {
   checkT3CodeWebUpdates,
   activateT3CodeWebVersion,
   garbageCollectT3CodeWebVersions,
+  installT3CodeWebRelease,
+  listT3CodeWebReleases,
   removeT3CodeWebVersion,
   setT3CodeWebVersionPin,
   updateT3CodeWebSettings,
@@ -101,6 +103,11 @@ function T3CodeUpdatesDialog({
   settings: GatewayStatus["t3codeWeb"] | undefined;
 }>) {
   const queryClient = useQueryClient();
+  const releasesQuery = useQuery({
+    queryKey: ["gateway", "t3code-web", "releases"],
+    queryFn: listT3CodeWebReleases,
+    enabled: open,
+  });
   const [updateChannel, setUpdateChannel] = useState<T3CodeWebChannel>("nightly");
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [autoGc, setAutoGc] = useState(false);
@@ -167,6 +174,21 @@ function T3CodeUpdatesDialog({
         type: "error",
         title: "Could not activate version",
         description: cause instanceof Error ? cause.message : "The version could not be activated.",
+      });
+    },
+  });
+
+  const installMutation = useMutation({
+    mutationFn: installT3CodeWebRelease,
+    onSuccess: (nextStatus) => {
+      applyStatus(nextStatus);
+      void releasesQuery.refetch();
+    },
+    onError: (cause) => {
+      toastManager.add({
+        type: "error",
+        title: "Could not install release",
+        description: cause instanceof Error ? cause.message : "The release could not be installed.",
       });
     },
   });
@@ -270,7 +292,9 @@ function T3CodeUpdatesDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(settings?.versions.length ?? 0) === 0 ? (
+                    {(settings?.versions.length ?? 0) === 0 &&
+                    (releasesQuery.data?.filter((release) => !release.installed).length ?? 0) ===
+                      0 ? (
                       <TableRow>
                         <TableCell colSpan={4} className="text-muted-foreground">
                           No T3 Code versions are installed.
@@ -339,6 +363,34 @@ function T3CodeUpdatesDialog({
                         </TableCell>
                       </TableRow>
                     ))}
+                    {(releasesQuery.data ?? [])
+                      .filter((release) => !release.installed)
+                      .map((release) => (
+                        <TableRow key={`release:${release.channel}:${release.version}`}>
+                          <TableCell className="font-mono text-xs">{release.version}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{release.channel}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">—</TableCell>
+                          <TableCell>
+                            <div className="flex justify-end">
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                disabled={installMutation.isPending}
+                                onClick={() =>
+                                  installMutation.mutate({
+                                    channel: release.channel,
+                                    version: release.version,
+                                  })
+                                }
+                              >
+                                Install
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -350,13 +402,30 @@ function T3CodeUpdatesDialog({
                       Check GitHub periodically for the selected channel.
                     </p>
                   </div>
-                  <Switch
-                    id="t3code-auto-update"
-                    checked={autoUpdate}
-                    onCheckedChange={(checked) =>
-                      saveDraft(updateChannel, checked, autoGc, keepRecent)
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={checkMutation.isPending}
+                      onClick={() => checkMutation.mutate({ channel: updateChannel })}
+                    >
+                      <RefreshCwIcon data-icon="inline-start" />
+                      {checkMutation.isPending
+                        ? "Updating..."
+                        : updateResult === "updated"
+                          ? "Updated"
+                          : updateResult === "none"
+                            ? "No updates"
+                            : "Check now"}
+                    </Button>
+                    <Switch
+                      id="t3code-auto-update"
+                      checked={autoUpdate}
+                      onCheckedChange={(checked) =>
+                        saveDraft(updateChannel, checked, autoGc, keepRecent)
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t pt-3">
                   <div className="flex flex-col gap-1">
@@ -439,23 +508,6 @@ function T3CodeUpdatesDialog({
               </div>
             </div>
           </DialogPanel>
-          <DialogFooter>
-            <Button
-              size="xs"
-              type="button"
-              disabled={checkMutation.isPending}
-              onClick={() => checkMutation.mutate({ channel: updateChannel })}
-            >
-              <RefreshCwIcon data-icon="inline-start" />
-              {checkMutation.isPending
-                ? "Updating..."
-                : updateResult === "updated"
-                  ? "Updated"
-                  : updateResult === "none"
-                    ? "No updates available"
-                    : "Check for updates"}
-            </Button>
-          </DialogFooter>
         </DialogPopup>
       </Dialog>
       <ConfirmDialog

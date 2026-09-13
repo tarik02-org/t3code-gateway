@@ -12,6 +12,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import type {
   GatewayStatus,
   T3CodeWebChannel,
+  T3CodeWebRelease,
   T3CodeWebVersionSource,
   UpdateT3CodeWebSettingsRequest,
 } from "@t3code-gateway/contracts/schemas";
@@ -43,14 +44,6 @@ type VersionRecord = {
 };
 
 const GitHubReleases = Schema.Array(GitHubRelease);
-
-const releaseForChannel = (channel: T3CodeWebChannel, releases: ReadonlyArray<GitHubRelease>) =>
-  releases.find((release) => {
-    if (release.draft) {
-      return false;
-    }
-    return channel === "nightly" ? release.prerelease : release.prerelease === false;
-  });
 
 const zipEntryPath = (entry: string, root: string, path: Path.Path) => {
   const normalized = path.normalize(entry);
@@ -99,6 +92,11 @@ export class T3CodeWebService extends Context.Service<
     ) => Effect.Effect<GatewayStatus["t3codeWeb"], T3CodeWebFailure>;
     readonly checkForUpdates: (
       channel: T3CodeWebChannel,
+    ) => Effect.Effect<GatewayStatus["t3codeWeb"], T3CodeWebFailure>;
+    readonly listReleases: Effect.Effect<ReadonlyArray<T3CodeWebRelease>, T3CodeWebFailure>;
+    readonly installRelease: (
+      channel: T3CodeWebChannel,
+      version: string,
     ) => Effect.Effect<GatewayStatus["t3codeWeb"], T3CodeWebFailure>;
     readonly activateVersion: (
       channel: T3CodeWebChannel,
@@ -239,7 +237,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     }
   });
 
-  const fetchLatestRelease = Effect.fn("T3CodeWebService.fetchLatestRelease")(function* (
+  const fetchReleases = Effect.fn("T3CodeWebService.fetchReleases")(function* (
     channel: T3CodeWebChannel,
   ) {
     const releasesUrl =
@@ -284,24 +282,42 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
               Effect.fail(storageFailure("GitHub returned an invalid T3 Code release response")),
             ),
           );
-    const release = releaseForChannel(channel, releases);
-    if (release === undefined) {
+    const matching = releases.filter(
+      (release) =>
+        !release.draft &&
+        (channel === "nightly" ? release.prerelease : release.prerelease === false),
+    );
+    if (matching.length === 0) {
       return yield* storageFailure(`GitHub has no ${channel} T3 Code release`);
     }
-    if (!/^v[0-9][A-Za-z0-9.-]*$/.test(release.tag_name)) {
-      return yield* storageFailure("GitHub returned an invalid T3 Code release tag");
+    const result: Array<{ readonly version: string; readonly url: string }> = [];
+    for (const release of matching) {
+      if (!/^v[0-9][A-Za-z0-9.-]*$/.test(release.tag_name)) {
+        return yield* storageFailure("GitHub returned an invalid T3 Code release tag");
+      }
+      const version = release.tag_name.slice(1);
+      const assetName = `T3-Code-Web-${version}.zip`;
+      const asset = release.assets.find((candidate) => candidate.name === assetName);
+      if (asset !== undefined) {
+        result.push({ version, url: asset.browser_download_url });
+      }
     }
-    const version = release.tag_name.slice(1);
-    const assetName = `T3-Code-Web-${version}.zip`;
-    const asset = release.assets.find((candidate) => candidate.name === assetName);
-    if (asset === undefined) {
-      return yield* storageFailure(`GitHub release ${release.tag_name} has no Web asset`);
-    }
-    return { version, url: asset.browser_download_url };
+    return result;
   });
 
-  const download = Effect.fn("T3CodeWebService.download")(function* (channel: T3CodeWebChannel) {
-    const release = yield* fetchLatestRelease(channel);
+  const fetchLatestRelease = Effect.fn("T3CodeWebService.fetchLatestRelease")(function* (
+    channel: T3CodeWebChannel,
+  ) {
+    const release = (yield* fetchReleases(channel))[0];
+    return release === undefined
+      ? yield* storageFailure(`GitHub has no ${channel} T3 Code Web release`)
+      : release;
+  });
+
+  const downloadRelease = Effect.fn("T3CodeWebService.downloadRelease")(function* (
+    channel: T3CodeWebChannel,
+    release: { readonly version: string; readonly url: string },
+  ) {
     const current = yield* listChannelVersions(channel);
     if (current.some((record) => record.version === release.version)) {
       return;
@@ -356,6 +372,39 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     yield* fs.writeFileString(path.join(temporary, "version.txt"), release.version);
     yield* fs.remove(target, { recursive: true, force: true });
     yield* fs.rename(temporary, target);
+  });
+
+  const download = Effect.fn("T3CodeWebService.download")(function* (channel: T3CodeWebChannel) {
+    yield* downloadRelease(channel, yield* fetchLatestRelease(channel));
+  });
+
+  const listReleases = Effect.fn("T3CodeWebService.listReleases")(function* () {
+    const result: Array<T3CodeWebRelease> = [];
+    for (const channel of channels) {
+      const installed = yield* listChannelVersions(channel);
+      for (const release of (yield* fetchReleases(channel)).slice(0, 5)) {
+        result.push({
+          channel,
+          version: release.version,
+          installed: installed.some((record) => record.version === release.version),
+        });
+      }
+    }
+    return result;
+  });
+
+  const installRelease = Effect.fn("T3CodeWebService.installRelease")(function* (
+    channel: T3CodeWebChannel,
+    version: string,
+  ) {
+    const release = (yield* fetchReleases(channel)).find(
+      (candidate) => candidate.version === version,
+    );
+    if (release === undefined) {
+      return yield* storageFailure(`T3 Code ${channel} version ${version} is unavailable`);
+    }
+    yield* downloadRelease(channel, release);
+    return yield* status();
   });
 
   const updateSettings = Effect.fn("T3CodeWebService.updateSettings")(function* (
@@ -504,6 +553,17 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       checkForUpdates(channel).pipe(
         Effect.catchTag("PlatformError", () =>
           Effect.fail(storageFailure("Could not check T3 Code Web versions")),
+        ),
+      ),
+    listReleases: listReleases().pipe(
+      Effect.catchTag("PlatformError", () =>
+        Effect.fail(storageFailure("Could not list T3 Code Web releases")),
+      ),
+    ),
+    installRelease: (channel: T3CodeWebChannel, version: string) =>
+      installRelease(channel, version).pipe(
+        Effect.catchTag("PlatformError", () =>
+          Effect.fail(storageFailure("Could not install the T3 Code Web release")),
         ),
       ),
     activateVersion: (channel: T3CodeWebChannel, version: string) =>

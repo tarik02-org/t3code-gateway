@@ -6,6 +6,7 @@ import {
   AuthFailure,
   ChangePasswordRequest,
   CheckT3CodeWebUpdatesRequest,
+  InstallT3CodeWebReleaseRequest,
   SetT3CodeWebVersionPinRequest,
   T3CodeWebVersionRequest,
   CreateEnvironmentPairingLinkRequest,
@@ -20,6 +21,7 @@ import {
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
   T3CodeWebFailure,
+  T3CodeWebRelease,
   UpdateT3CodeWebSettingsRequest,
   TraefikConfigResponse,
   UpdateEnvironmentRequest,
@@ -75,6 +77,17 @@ export class UpdateT3CodeWebSettings extends Rpc.make("gateway.t3codeWeb.setting
 
 export class CheckT3CodeWebUpdates extends Rpc.make("gateway.t3codeWeb.updates.check", {
   payload: CheckT3CodeWebUpdatesRequest,
+  success: GatewayStatus,
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class ListT3CodeWebReleases extends Rpc.make("gateway.t3codeWeb.releases.list", {
+  success: Schema.Array(T3CodeWebRelease),
+  error: T3CodeWebFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class InstallT3CodeWebRelease extends Rpc.make("gateway.t3codeWeb.releases.install", {
+  payload: InstallT3CodeWebReleaseRequest,
   success: GatewayStatus,
   error: T3CodeWebFailure,
 }).middleware(GatewaySessionMiddleware) {}
@@ -201,6 +214,8 @@ export class GatewayRpcs extends RpcGroup.make(
   GetTraefikConfig,
   UpdateT3CodeWebSettings,
   CheckT3CodeWebUpdates,
+  ListT3CodeWebReleases,
+  InstallT3CodeWebRelease,
   ActivateT3CodeWebVersion,
   RemoveT3CodeWebVersion,
   SetT3CodeWebVersionPin,

@@ -15,6 +15,14 @@ export const T3CodeWebVersion = Schema.Struct({
 
 export type T3CodeWebVersion = typeof T3CodeWebVersion.Type;
 
+export const T3CodeWebRelease = Schema.Struct({
+  channel: Schema.Literals(["stable", "nightly"]),
+  version: Schema.String,
+  installed: Schema.Boolean,
+});
+
+export type T3CodeWebRelease = typeof T3CodeWebRelease.Type;
+
 export const T3CodeWebStatus = Schema.Struct({
   available: Schema.Boolean,
   updateChannel: Schema.Literals(["stable", "nightly"]),
@@ -77,6 +85,13 @@ export const SetT3CodeWebVersionPinRequest = Schema.Struct({
 });
 
 export type SetT3CodeWebVersionPinRequest = typeof SetT3CodeWebVersionPinRequest.Type;
+
+export const InstallT3CodeWebReleaseRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.String,
+});
+
+export type InstallT3CodeWebReleaseRequest = typeof InstallT3CodeWebReleaseRequest.Type;
 
 export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
   "T3CodeWebFailure",

@@ -8,11 +8,13 @@ import type {
   EnvironmentPairingLink,
   EnvironmentRecord,
   GatewayStatus,
+  InstallT3CodeWebReleaseRequest,
   LoginRequest,
   LoginResponse,
   RevokeEnvironmentClientResponse,
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
+  T3CodeWebRelease,
   TraefikConfigResponse,
   UpdateT3CodeWebSettingsRequest,
   SetT3CodeWebVersionPinRequest,
@@ -82,6 +84,16 @@ export async function checkT3CodeWebUpdates(
   payload: CheckT3CodeWebUpdatesRequest,
 ): Promise<GatewayStatus> {
   return runGatewayRpc((client) => client["gateway.t3codeWeb.updates.check"](payload));
+}
+
+export async function listT3CodeWebReleases(): Promise<ReadonlyArray<T3CodeWebRelease>> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.releases.list"](undefined));
+}
+
+export async function installT3CodeWebRelease(
+  payload: InstallT3CodeWebReleaseRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.releases.install"](payload));
 }
 
 export async function activateT3CodeWebVersion(

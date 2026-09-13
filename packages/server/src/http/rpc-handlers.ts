@@ -74,6 +74,17 @@ export const layer = GatewayRpcs.toLayer(
           Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
         ),
 
+      "gateway.t3codeWeb.releases.list": () =>
+        t3codeWeb.listReleases.pipe(
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.releases.install": (payload) =>
+        t3codeWeb.installRelease(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
       "gateway.t3codeWeb.versions.activate": (payload) =>
         t3codeWeb.activateVersion(payload.channel, payload.version).pipe(
           Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
