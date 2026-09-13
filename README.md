@@ -67,8 +67,9 @@ Add the `build-image` label to a same-repository pull request to build and publi
 `ghcr.io/tarik02-org/t3code-gateway:pr-<number>` without merging it. The image is
 rebuilt for every subsequent push while the label remains attached, and the workflow
 updates a pull request comment with the image reference. Fork pull requests are skipped.
-The build runs without write credentials; a trusted follow-up workflow publishes the
-artifact only after verifying that the PR is still open, labeled, and at the built commit.
+The shared `build` workflow creates the artifact without write credentials; a trusted
+`workflow_run` publisher publishes it only after verifying that the PR is still open,
+labeled, and at the built commit. The same `build` workflow publishes release tags.
 
 ## License
 

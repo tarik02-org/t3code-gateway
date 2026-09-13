@@ -11,14 +11,21 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     if: ${{ github.repository == 'tarik02-org/t3code-gateway' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.image.outputs.version }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
@@ -30,9 +37,6 @@ jobs:
           node-version: 24.13.1
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - run: pnpm fetch --frozen-lockfile --prefer-offline
 
@@ -46,28 +50,92 @@ jobs:
 
       - run: pnpm build
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      - name: Setup Docker Buildx
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'build-image'))
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Download bundled T3 Code versions
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'build-image'))
         run: pnpm download:t3code-web
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      - name: Prepare container runtime
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'build-image'))
         run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        id: version
+      - id: image
+        name: Resolve image metadata
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'build-image'))
+        shell: bash
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: echo "version=${RELEASE_TAG#v}" >>"${GITHUB_OUTPUT}"
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          if [[ "$RELEASE_TAG" == v* ]]; then
+            version="${RELEASE_TAG#v}"
+            artifact_kind="release"
+            artifact_name="runtime-app"
+          else
+            version="pr-$PR_NUMBER"
+            artifact_kind="pr"
+            artifact_name="pr-image-${PR_NUMBER}-${HEAD_SHA}"
+          fi
+
+          {
+            echo "version=$version"
+            echo "artifact_kind=$artifact_kind"
+            echo "artifact_name=$artifact_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build PR container artifact
+        if: steps.image.outputs.artifact_kind == 'pr'
+        env:
+          VERSION: ${{ steps.image.outputs.version }}
+        run: >-
+          docker buildx build
+          --file Containerfile
+          --tag "t3code-gateway:${VERSION}"
+          --output "type=docker,dest=pr-image.tar"
+          .
+
+      - name: Upload PR container artifact
+        if: steps.image.outputs.artifact_kind == 'pr'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
-          name: runtime-app
+          name: ${{ steps.image.outputs.artifact_name }}
+          path: pr-image.tar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload release runtime
+        if: steps.image.outputs.artifact_kind == 'release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: ${{ steps.image.outputs.artifact_name }}
           path: packaging/runtime/app
           if-no-files-found: error
           retention-days: 1
 
   publish:
-    name: Publish image
+    name: Publish release image
     needs: build
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
@@ -90,10 +158,9 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+      - uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           IMAGE: ghcr.io/${{ github.repository }}
           VERSION: ${{ needs.build.outputs.version }}

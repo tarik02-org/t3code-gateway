@@ -2,7 +2,7 @@ name: Publish PR image
 
 on:
   workflow_run:
-    workflows: [PR image build]
+    workflows: [build]
     types: [completed]
 
 permissions:
