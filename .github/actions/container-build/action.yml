@@ -28,15 +28,16 @@ runs:
 
     - name: Build PR container artifact
       if: inputs.artifact-kind == 'pr'
-      shell: bash
+      uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
       env:
+        IMAGE: t3code-gateway
         VERSION: ${{ inputs.version }}
-      run: >-
-        docker buildx build
-        --file Containerfile
-        --tag "t3code-gateway:${VERSION}"
-        --output "type=docker,dest=pr-image.tar"
-        .
+      with:
+        files: docker-bake.hcl
+        source: .
+        set: |
+          *.platform=linux/amd64
+          *.output=type=docker,dest=pr-image.tar
 
     - name: Upload PR container artifact
       if: inputs.artifact-kind == 'pr'
