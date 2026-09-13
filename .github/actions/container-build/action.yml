@@ -1,0 +1,58 @@
+name: Build container artifact
+description: Build the bundled T3 Code gateway container artifact.
+
+inputs:
+  artifact-kind:
+    description: Either pr or release.
+    required: true
+  artifact-name:
+    description: Artifact name to upload.
+    required: true
+  version:
+    description: Container version or PR tag.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+    - name: Download bundled T3 Code versions
+      shell: bash
+      run: pnpm download:t3code-web
+
+    - name: Prepare container runtime
+      shell: bash
+      run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
+
+    - name: Build PR container artifact
+      if: inputs.artifact-kind == 'pr'
+      uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+      env:
+        IMAGE: t3code-gateway
+        VERSION: ${{ inputs.version }}
+      with:
+        files: docker-bake.hcl
+        source: .
+        set: |
+          *.platform=linux/amd64
+          *.output=type=docker,dest=pr-image.tar
+
+    - name: Upload PR container artifact
+      if: inputs.artifact-kind == 'pr'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: pr-image.tar
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload release runtime
+      if: inputs.artifact-kind == 'release'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: packaging/runtime/app
+        if-no-files-found: error
+        retention-days: 1

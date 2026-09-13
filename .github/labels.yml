@@ -1,0 +1,3 @@
+- name: build-image
+  color: "1d76db"
+  description: Build a container artifact for this pull request.

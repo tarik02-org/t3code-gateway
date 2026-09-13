@@ -10,14 +10,22 @@ on:
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     if: ${{ github.repository == 'tarik02-org/t3code-gateway' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.image.outputs.version }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
@@ -29,9 +37,6 @@ jobs:
           node-version: 24.13.1
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - run: pnpm fetch --frozen-lockfile --prefer-offline
 
@@ -45,30 +50,75 @@ jobs:
 
       - run: pnpm build
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: pnpm download:t3code-web
-
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: T3CODE_WEB_DIST=packaging/runtime/t3code-web-dist pnpm package:runtime
-
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        id: version
+      - id: image
+        name: Resolve image metadata
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'build-image'))
+        shell: bash
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: echo "version=${RELEASE_TAG#v}" >>"${GITHUB_OUTPUT}"
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+          if [[ "$RELEASE_TAG" == v* ]]; then
+            version="${RELEASE_TAG#v}"
+            artifact_kind="release"
+            artifact_name="runtime-app"
+          else
+            version="pr-$PR_NUMBER"
+            artifact_kind="pr"
+            artifact_name="pr-image-${PR_NUMBER}-${HEAD_SHA}"
+          fi
+
+          {
+            echo "version=$version"
+            echo "artifact_kind=$artifact_kind"
+            echo "artifact_name=$artifact_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build container artifact
+        if: steps.image.outputs.artifact_kind != ''
+        uses: ./.github/actions/container-build
+        with:
+          artifact-kind: ${{ steps.image.outputs.artifact_kind }}
+          artifact-name: ${{ steps.image.outputs.artifact_name }}
+          version: ${{ steps.image.outputs.version }}
+
+  publish:
+    name: Publish release image
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.0
+        with:
+          name: runtime-app
+          path: packaging/runtime/app
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+      - uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           IMAGE: ghcr.io/${{ github.repository }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         with:
           files: docker-bake.hcl
           source: .
