@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCwIcon } from "lucide-react";
+import { PinIcon, PinOffIcon, PlayIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
@@ -21,9 +21,14 @@ import { Label } from "./ui/label.tsx";
 import { Switch } from "./ui/switch.tsx";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
 import { T3Logo } from "./logo.tsx";
+import { ConfirmDialog } from "./confirm-dialog.tsx";
 import {
   changePassword,
   checkT3CodeWebUpdates,
+  activateT3CodeWebVersion,
+  garbageCollectT3CodeWebVersions,
+  removeT3CodeWebVersion,
+  setT3CodeWebVersionPin,
   updateT3CodeWebSettings,
 } from "../lib/gateway-api.ts";
 import { GATEWAY_STATUS_QUERY_KEY } from "../features/environments/query-keys.ts";
@@ -55,7 +60,7 @@ export function AdminShell({
         {t3codeWeb?.available === true ? (
           <Button size="xs" variant="outline" onClick={() => setUpdatesOpen(true)}>
             <RefreshCwIcon data-icon="inline-start" />
-            T3 Code updates
+            T3 Code Versions
           </Button>
         ) : null}
         {actions}
@@ -86,11 +91,19 @@ function T3CodeUpdatesDialog({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
+  const [removeCandidate, setRemoveCandidate] = useState<{
+    readonly channel: T3CodeWebChannel;
+    readonly version: string;
+  } | null>(null);
+
+  const applyStatus = (nextStatus: GatewayStatus) => {
+    queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
+  };
 
   const settingsMutation = useMutation({
     mutationFn: updateT3CodeWebSettings,
     onSuccess: (nextStatus) => {
-      queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
+      applyStatus(nextStatus);
       setMessage("Update settings saved.");
       setError(null);
     },
@@ -107,11 +120,70 @@ function T3CodeUpdatesDialog({
       setUpdateResult(null);
     },
     onSuccess: (nextStatus) => {
-      queryClient.setQueryData(GATEWAY_STATUS_QUERY_KEY, nextStatus);
-      const previousVersion = settings?.channels[channel].installedVersion ?? null;
-      const nextVersion = nextStatus.t3codeWeb.channels[channel].installedVersion;
+      applyStatus(nextStatus);
+      const previousVersion =
+        settings?.versions
+          .filter((version) => version.channel === channel)
+          .map((version) => version.version)
+          .toSorted()
+          .at(-1) ?? null;
+      const nextVersion =
+        nextStatus.t3codeWeb.versions
+          .filter((version) => version.channel === channel)
+          .map((version) => version.version)
+          .toSorted()
+          .at(-1) ?? null;
       setUpdateResult(previousVersion === nextVersion ? "none" : "updated");
       setError(null);
+    },
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: activateT3CodeWebVersion,
+    onSuccess: (nextStatus) => {
+      applyStatus(nextStatus);
+      setMessage("Version activated and pinned.");
+      setError(null);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not activate that version.");
+    },
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: setT3CodeWebVersionPin,
+    onSuccess: (nextStatus) => {
+      applyStatus(nextStatus);
+      setMessage("Version pin updated.");
+      setError(null);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not update the version pin.");
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: removeT3CodeWebVersion,
+    onSuccess: (nextStatus) => {
+      applyStatus(nextStatus);
+      setRemoveCandidate(null);
+      setMessage("Version removed.");
+      setError(null);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not remove that version.");
+    },
+  });
+
+  const gcMutation = useMutation({
+    mutationFn: garbageCollectT3CodeWebVersions,
+    onSuccess: (nextStatus) => {
+      applyStatus(nextStatus);
+      setMessage("Unused versions removed.");
+      setError(null);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : "Could not remove unused versions.");
     },
   });
 
@@ -125,94 +197,209 @@ function T3CodeUpdatesDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen && settings !== undefined) {
-          setChannel(settings.channel);
-          setAutoUpdate(settings.autoUpdate);
-          setMessage(null);
-          setError(null);
-          setUpdateResult(null);
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen && settings !== undefined) {
+            setChannel(settings.channel);
+            setAutoUpdate(settings.autoUpdate);
+            setMessage(null);
+            setError(null);
+            setUpdateResult(null);
+          }
+          onOpenChange(nextOpen);
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>T3 Code Versions</DialogTitle>
+            <DialogDescription>
+              Manage bundled and downloaded versions, pins, and automatic updates.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <Label>Channel</Label>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={channel}
+                  onValueChange={(value) => {
+                    if (value === "stable" || value === "nightly") {
+                      saveDraft(value, autoUpdate);
+                    }
+                  }}
+                  aria-label="T3 Code update channel"
+                >
+                  <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
+                  <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
+                </ToggleGroup>
+                <div className="flex flex-col gap-2">
+                  {(settings?.versions ?? []).map((version) => (
+                    <div
+                      key={`${version.channel}:${version.version}`}
+                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{version.channel}</Badge>
+                          <span className="font-mono text-xs">{version.version}</span>
+                          {version.active ? <Badge>Active</Badge> : null}
+                          {version.pinned ? <Badge variant="secondary">Pinned</Badge> : null}
+                          {version.forcedPinned ? <Badge variant="secondary">Bundled</Badge> : null}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1">
+                        {!version.active ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={activateMutation.isPending}
+                            onClick={() =>
+                              activateMutation.mutate({
+                                channel: version.channel,
+                                version: version.version,
+                              })
+                            }
+                          >
+                            <PlayIcon data-icon="inline-start" />
+                            Activate
+                          </Button>
+                        ) : null}
+                        {!version.forcedPinned && version.pinned ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={pinMutation.isPending}
+                            onClick={() =>
+                              pinMutation.mutate({ channel: version.channel, version: null })
+                            }
+                          >
+                            <PinOffIcon data-icon="inline-start" />
+                            Unpin
+                          </Button>
+                        ) : null}
+                        {!version.forcedPinned && !version.pinned ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={pinMutation.isPending}
+                            onClick={() =>
+                              pinMutation.mutate({
+                                channel: version.channel,
+                                version: version.version,
+                              })
+                            }
+                          >
+                            <PinIcon data-icon="inline-start" />
+                            Pin
+                          </Button>
+                        ) : null}
+                        {version.source === "downloaded" && !version.active && !version.pinned ? (
+                          <Button
+                            size="xs"
+                            variant="destructive"
+                            disabled={removeMutation.isPending}
+                            onClick={() =>
+                              setRemoveCandidate({
+                                channel: version.channel,
+                                version: version.version,
+                              })
+                            }
+                          >
+                            <Trash2Icon data-icon="inline-start" />
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                  {(settings?.versions.length ?? 0) === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No T3 Code versions are installed.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Label>Installed versions</Label>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={gcMutation.isPending}
+                  onClick={() => gcMutation.mutate()}
+                >
+                  <Trash2Icon data-icon="inline-start" />
+                  {gcMutation.isPending ? "Collecting..." : "GC unused"}
+                </Button>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="t3code-auto-update">Automatic updates</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Check GitHub periodically for the selected channel.
+                  </p>
+                </div>
+                <Switch
+                  id="t3code-auto-update"
+                  checked={autoUpdate}
+                  onCheckedChange={(checked) => saveDraft(channel, checked)}
+                />
+              </div>
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <div className="flex-1 text-xs sm:mr-auto">
+              {error !== null ? (
+                <span className="text-destructive-foreground">{error}</span>
+              ) : message !== null ? (
+                <span className="text-success-foreground">{message}</span>
+              ) : null}
+            </div>
+            <Button
+              size="xs"
+              type="button"
+              disabled={checkMutation.isPending}
+              onClick={() => checkMutation.mutate({ channel })}
+            >
+              <RefreshCwIcon data-icon="inline-start" />
+              {checkMutation.isPending
+                ? "Updating..."
+                : updateResult === "updated"
+                  ? "Updated"
+                  : updateResult === "none"
+                    ? "No updates available"
+                    : "Check for updates"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+      <ConfirmDialog
+        open={removeCandidate !== null}
+        title="Remove T3 Code version?"
+        description={
+          removeCandidate === null
+            ? ""
+            : `Remove ${removeCandidate.version} from the ${removeCandidate.channel} channel?`
         }
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DialogPopup className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>T3 Code updates</DialogTitle>
-          <DialogDescription>
-            Choose a channel, save changes automatically, or update it immediately.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <Label>Channel</Label>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={channel}
-                onValueChange={(value) => {
-                  if (value === "stable" || value === "nightly") {
-                    saveDraft(value, autoUpdate);
-                  }
-                }}
-                aria-label="T3 Code update channel"
-              >
-                <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
-                <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
-              </ToggleGroup>
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">
-                  Stable {settings?.channels.stable.installedVersion ?? "not installed"}
-                </Badge>
-                <Badge variant="outline">
-                  Nightly {settings?.channels.nightly.installedVersion ?? "not installed"}
-                </Badge>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="t3code-auto-update">Automatic updates</Label>
-                <p className="text-xs text-muted-foreground">
-                  Check GitHub periodically for the selected channel.
-                </p>
-              </div>
-              <Switch
-                id="t3code-auto-update"
-                checked={autoUpdate}
-                onCheckedChange={(checked) => saveDraft(channel, checked)}
-              />
-            </div>
-          </div>
-        </DialogPanel>
-        <DialogFooter>
-          <div className="flex-1 text-xs sm:mr-auto">
-            {error !== null ? (
-              <span className="text-destructive-foreground">{error}</span>
-            ) : message !== null ? (
-              <span className="text-success-foreground">{message}</span>
-            ) : null}
-          </div>
-          <Button
-            size="xs"
-            type="button"
-            disabled={checkMutation.isPending}
-            onClick={() => checkMutation.mutate({ channel })}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            {checkMutation.isPending
-              ? "Updating..."
-              : updateResult === "updated"
-                ? "Updated"
-                : updateResult === "none"
-                  ? "No updates available"
-                  : "Check for updates"}
-          </Button>
-        </DialogFooter>
-      </DialogPopup>
-    </Dialog>
+        confirmLabel="Remove version"
+        pendingLabel="Removing..."
+        destructive
+        pending={removeMutation.isPending}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !removeMutation.isPending) {
+            setRemoveCandidate(null);
+          }
+        }}
+        onConfirm={() => {
+          if (removeCandidate !== null) {
+            removeMutation.mutate(removeCandidate);
+          }
+        }}
+      />
+    </>
   );
 }
 

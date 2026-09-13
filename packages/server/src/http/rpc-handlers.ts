@@ -74,6 +74,30 @@ export const layer = GatewayRpcs.toLayer(
           Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
         ),
 
+      "gateway.t3codeWeb.versions.activate": (payload) =>
+        t3codeWeb.activateVersion(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.remove": (payload) =>
+        t3codeWeb.removeVersion(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.pin": (payload) =>
+        t3codeWeb.setVersionPin(payload.channel, payload.version).pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
+      "gateway.t3codeWeb.versions.gc": () =>
+        t3codeWeb.garbageCollect.pipe(
+          Effect.flatMap(() => buildGatewayStatus().pipe(Effect.orDie)),
+          Effect.catchTag("T3CodeWebFailure", (error) => Effect.fail(error)),
+        ),
+
       "gateway.environments.list": () =>
         environments.list().pipe(Effect.catchTags(environmentRpcDatabaseErrors)),
 

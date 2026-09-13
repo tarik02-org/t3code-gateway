@@ -46,7 +46,8 @@ docker run \
 Open `/admin/login`. On first start, the gateway logs the generated password for the `admin` user.
 
 The image includes both stable and nightly T3 Code Web builds. After signing in, use the `T3 Code
-updates` button to switch channels, enable automatic updates, or check for an update immediately.
+Versions` button to switch channels, pin versions, collect unused downloads, enable automatic
+updates, or check for an update immediately.
 GitHub-backed automatic updates are disabled by default; downloaded builds are stored in the gateway
 data volume.
 

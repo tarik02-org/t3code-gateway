@@ -22,10 +22,7 @@ export const buildGatewayStatus = Effect.fn("buildGatewayStatus")(function* () {
             available: false,
             channel: "nightly" as const,
             autoUpdate: false,
-            channels: {
-              stable: { installedVersion: null },
-              nightly: { installedVersion: null },
-            },
+            versions: [],
           },
   };
 });

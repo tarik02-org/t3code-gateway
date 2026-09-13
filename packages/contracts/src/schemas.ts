@@ -1,24 +1,36 @@
 import * as Schema from "effect/Schema";
 
+export const T3CodeWebVersionSource = Schema.Literals(["bundled", "downloaded"]);
+
+export type T3CodeWebVersionSource = typeof T3CodeWebVersionSource.Type;
+
+export const T3CodeWebVersion = Schema.Struct({
+  channel: Schema.Literals(["stable", "nightly"]),
+  version: Schema.String,
+  source: T3CodeWebVersionSource,
+  active: Schema.Boolean,
+  pinned: Schema.Boolean,
+  forcedPinned: Schema.Boolean,
+});
+
+export type T3CodeWebVersion = typeof T3CodeWebVersion.Type;
+
+export const T3CodeWebStatus = Schema.Struct({
+  available: Schema.Boolean,
+  channel: Schema.Literals(["stable", "nightly"]),
+  autoUpdate: Schema.Boolean,
+  versions: Schema.Array(T3CodeWebVersion),
+});
+
+export type T3CodeWebStatus = typeof T3CodeWebStatus.Type;
+
 export const GatewayStatus = Schema.Struct({
   ok: Schema.Boolean,
   version: Schema.String,
   database: Schema.Struct({
     migrated: Schema.Boolean,
   }),
-  t3codeWeb: Schema.Struct({
-    available: Schema.Boolean,
-    channel: Schema.Literals(["stable", "nightly"]),
-    autoUpdate: Schema.Boolean,
-    channels: Schema.Struct({
-      stable: Schema.Struct({
-        installedVersion: Schema.NullOr(Schema.String),
-      }),
-      nightly: Schema.Struct({
-        installedVersion: Schema.NullOr(Schema.String),
-      }),
-    }),
-  }),
+  t3codeWeb: T3CodeWebStatus,
 });
 
 export type GatewayStatus = typeof GatewayStatus.Type;
@@ -39,6 +51,20 @@ export const CheckT3CodeWebUpdatesRequest = Schema.Struct({
 });
 
 export type CheckT3CodeWebUpdatesRequest = typeof CheckT3CodeWebUpdatesRequest.Type;
+
+export const T3CodeWebVersionRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.String,
+});
+
+export type T3CodeWebVersionRequest = typeof T3CodeWebVersionRequest.Type;
+
+export const SetT3CodeWebVersionPinRequest = Schema.Struct({
+  channel: T3CodeWebChannel,
+  version: Schema.NullOr(Schema.String),
+});
+
+export type SetT3CodeWebVersionPinRequest = typeof SetT3CodeWebVersionPinRequest.Type;
 
 export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
   "T3CodeWebFailure",

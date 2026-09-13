@@ -33,10 +33,24 @@ const gatewayStatus = {
     available: true,
     channel: "nightly",
     autoUpdate: false,
-    channels: {
-      stable: { installedVersion: "2026.9.700" },
-      nightly: { installedVersion: "2026.8.2901-nightly.20260907.483" },
-    },
+    versions: [
+      {
+        channel: "stable",
+        version: "2026.9.700",
+        source: "bundled",
+        active: false,
+        pinned: true,
+        forcedPinned: true,
+      },
+      {
+        channel: "nightly",
+        version: "2026.8.2901-nightly.20260907.483",
+        source: "bundled",
+        active: true,
+        pinned: true,
+        forcedPinned: true,
+      },
+    ],
   },
 } satisfies GatewayStatus;
 

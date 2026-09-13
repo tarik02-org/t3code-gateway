@@ -15,6 +15,8 @@ import type {
   T3CodeCatalogEntryResponse,
   TraefikConfigResponse,
   UpdateT3CodeWebSettingsRequest,
+  SetT3CodeWebVersionPinRequest,
+  T3CodeWebVersionRequest,
   UpdateEnvironmentRequest,
   ValidateEnvironmentResponse,
 } from "@t3code-gateway/contracts/schemas";
@@ -80,6 +82,28 @@ export async function checkT3CodeWebUpdates(
   payload: CheckT3CodeWebUpdatesRequest,
 ): Promise<GatewayStatus> {
   return runGatewayRpc((client) => client["gateway.t3codeWeb.updates.check"](payload));
+}
+
+export async function activateT3CodeWebVersion(
+  payload: T3CodeWebVersionRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.activate"](payload));
+}
+
+export async function removeT3CodeWebVersion(
+  payload: T3CodeWebVersionRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.remove"](payload));
+}
+
+export async function setT3CodeWebVersionPin(
+  payload: SetT3CodeWebVersionPinRequest,
+): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.pin"](payload));
+}
+
+export async function garbageCollectT3CodeWebVersions(): Promise<GatewayStatus> {
+  return runGatewayRpc((client) => client["gateway.t3codeWeb.versions.gc"](undefined));
 }
 
 export async function getTraefikConfig(): Promise<TraefikConfigResponse> {
