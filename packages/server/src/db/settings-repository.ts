@@ -15,9 +15,14 @@ import { gatewaySettings } from "./schema.ts";
 
 const UPDATE_CHANNEL_KEY = "t3code.web.updateChannel";
 const AUTO_UPDATE_KEY = "t3code.web.autoUpdate";
+const AUTO_GC_KEY = "t3code.web.autoGc";
 const PINNED_VERSION_KEYS = {
   stable: "t3code.web.pinned.stable",
   nightly: "t3code.web.pinned.nightly",
+} as const;
+const KEEP_RECENT_KEYS = {
+  stable: "t3code.web.keepRecent.stable",
+  nightly: "t3code.web.keepRecent.nightly",
 } as const;
 
 const StoredGatewaySetting = Schema.Struct({
@@ -32,6 +37,11 @@ const StoredAutoUpdate = Schema.Literals(["true", "false"]);
 export type GatewaySettings = {
   readonly updateChannel: T3CodeWebChannelType;
   readonly autoUpdate: boolean;
+  readonly autoGc: boolean;
+  readonly keepRecent: {
+    readonly stable: number;
+    readonly nightly: number;
+  };
   readonly pinnedVersions: {
     readonly stable: string | null;
     readonly nightly: string | null;
@@ -47,22 +57,55 @@ const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, Da
     Effect.flatMap((settings) => {
       const updateChannel = settings.find((setting) => setting.key === UPDATE_CHANNEL_KEY);
       const autoUpdate = settings.find((setting) => setting.key === AUTO_UPDATE_KEY);
+      const autoGc = settings.find((setting) => setting.key === AUTO_GC_KEY);
       const stablePin = settings.find((setting) => setting.key === PINNED_VERSION_KEYS.stable);
       const nightlyPin = settings.find((setting) => setting.key === PINNED_VERSION_KEYS.nightly);
+      const stableKeepRecent = settings.find((setting) => setting.key === KEEP_RECENT_KEYS.stable);
+      const nightlyKeepRecent = settings.find(
+        (setting) => setting.key === KEEP_RECENT_KEYS.nightly,
+      );
       if (
         updateChannel === undefined ||
         autoUpdate === undefined ||
+        autoGc === undefined ||
         stablePin === undefined ||
-        nightlyPin === undefined
+        nightlyPin === undefined ||
+        stableKeepRecent === undefined ||
+        nightlyKeepRecent === undefined
       ) {
         return invalidSettings();
       }
       return Schema.decodeUnknownEffect(
-        Schema.Struct({ channel: T3CodeWebChannel, autoUpdate: StoredAutoUpdate }),
-      )({ channel: updateChannel.value, autoUpdate: autoUpdate.value }).pipe(
+        Schema.Struct({
+          channel: T3CodeWebChannel,
+          autoUpdate: StoredAutoUpdate,
+          autoGc: StoredAutoUpdate,
+          stableKeepRecent: Schema.NumberFromString,
+          nightlyKeepRecent: Schema.NumberFromString,
+        }),
+      )({
+        channel: updateChannel.value,
+        autoUpdate: autoUpdate.value,
+        autoGc: autoGc.value,
+        stableKeepRecent: stableKeepRecent.value,
+        nightlyKeepRecent: nightlyKeepRecent.value,
+      }).pipe(
+        Effect.flatMap((decoded) =>
+          decoded.stableKeepRecent >= 0 &&
+          Number.isInteger(decoded.stableKeepRecent) &&
+          decoded.nightlyKeepRecent >= 0 &&
+          Number.isInteger(decoded.nightlyKeepRecent)
+            ? Effect.succeed(decoded)
+            : invalidSettings(),
+        ),
         Effect.map((decoded) => ({
           updateChannel: decoded.channel,
           autoUpdate: decoded.autoUpdate === "true",
+          autoGc: decoded.autoGc === "true",
+          keepRecent: {
+            stable: decoded.stableKeepRecent,
+            nightly: decoded.nightlyKeepRecent,
+          },
           pinnedVersions: {
             stable: stablePin.value === "" ? null : stablePin.value,
             nightly: nightlyPin.value === "" ? null : nightlyPin.value,
@@ -83,9 +126,10 @@ export class SettingsRepository extends Context.Service<
   {
     readonly get: Effect.Effect<GatewaySettings, DatabaseError>;
     readonly update: (
-      input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate">> & {
+      input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate" | "autoGc">> & {
         readonly updatedAt: string;
         readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
+        readonly keepRecent?: Partial<GatewaySettings["keepRecent"]>;
       },
     ) => Effect.Effect<GatewaySettings, DatabaseError>;
   }
@@ -106,9 +150,10 @@ export const make = Effect.gen(function* () {
     );
 
   const update = (
-    input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate">> & {
+    input: Partial<Pick<GatewaySettings, "updateChannel" | "autoUpdate" | "autoGc">> & {
       readonly updatedAt: string;
       readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
+      readonly keepRecent?: Partial<GatewaySettings["keepRecent"]>;
     },
   ) =>
     Effect.gen(function* () {
@@ -127,6 +172,9 @@ export const make = Effect.gen(function* () {
           : [
               { key: AUTO_UPDATE_KEY, value: String(input.autoUpdate), updatedAt: input.updatedAt },
             ]),
+        ...(input.autoGc === undefined
+          ? []
+          : [{ key: AUTO_GC_KEY, value: String(input.autoGc), updatedAt: input.updatedAt }]),
         ...(input.pinnedVersions?.stable === undefined
           ? []
           : [
@@ -142,6 +190,24 @@ export const make = Effect.gen(function* () {
               {
                 key: PINNED_VERSION_KEYS.nightly,
                 value: input.pinnedVersions.nightly ?? "",
+                updatedAt: input.updatedAt,
+              },
+            ]),
+        ...(input.keepRecent?.stable === undefined
+          ? []
+          : [
+              {
+                key: KEEP_RECENT_KEYS.stable,
+                value: String(input.keepRecent.stable),
+                updatedAt: input.updatedAt,
+              },
+            ]),
+        ...(input.keepRecent?.nightly === undefined
+          ? []
+          : [
+              {
+                key: KEEP_RECENT_KEYS.nightly,
+                value: String(input.keepRecent.nightly),
                 updatedAt: input.updatedAt,
               },
             ]),

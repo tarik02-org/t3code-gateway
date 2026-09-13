@@ -22,6 +22,8 @@ export const buildGatewayStatus = Effect.fn("buildGatewayStatus")(function* () {
             available: false,
             updateChannel: "nightly" as const,
             autoUpdate: false,
+            autoGc: false,
+            keepRecent: { stable: 2, nightly: 2 },
             versions: [],
           },
   };

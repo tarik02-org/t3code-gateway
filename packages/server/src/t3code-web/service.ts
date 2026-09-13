@@ -197,6 +197,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       available: staticRoot !== null && records.length > 0,
       updateChannel: current.updateChannel,
       autoUpdate: current.autoUpdate,
+      autoGc: current.autoGc,
+      keepRecent: current.keepRecent,
       versions: records
         .map((record) => ({
           channel: record.channel,
@@ -363,6 +365,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       updatedAt: DateTime.formatIso(yield* DateTime.now),
       ...(input.updateChannel === undefined ? {} : { updateChannel: input.updateChannel }),
       ...(input.autoUpdate === undefined ? {} : { autoUpdate: input.autoUpdate }),
+      ...(input.autoGc === undefined ? {} : { autoGc: input.autoGc }),
+      ...(input.keepRecent === undefined ? {} : { keepRecent: input.keepRecent }),
     };
     yield* settings
       .update(nextSettings)
@@ -453,11 +457,18 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     const current = yield* readSettings;
     const active = yield* activeTarget();
     for (const channel of channels) {
-      for (const record of yield* listChannelVersions(channel)) {
+      const records = yield* listChannelVersions(channel);
+      const recentDownloaded = records
+        .filter((record) => record.source === "downloaded")
+        .toSorted((left, right) => right.version.localeCompare(left.version))
+        .slice(0, current.keepRecent[channel]);
+      const recentVersions = new Set(recentDownloaded.map((record) => record.version));
+      for (const record of records) {
         if (
           record.source === "downloaded" &&
           active !== record.root &&
-          current.pinnedVersions[channel] !== record.version
+          current.pinnedVersions[channel] !== record.version &&
+          !recentVersions.has(record.version)
         ) {
           yield* fs.remove(record.root, { recursive: true, force: true });
         }
@@ -470,6 +481,9 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     const current = yield* readSettings;
     if (current.autoUpdate) {
       yield* checkForUpdates(current.updateChannel);
+    }
+    if (current.autoGc) {
+      yield* garbageCollect();
     }
   });
 

@@ -19,6 +19,11 @@ export const T3CodeWebStatus = Schema.Struct({
   available: Schema.Boolean,
   updateChannel: Schema.Literals(["stable", "nightly"]),
   autoUpdate: Schema.Boolean,
+  autoGc: Schema.Boolean,
+  keepRecent: Schema.Struct({
+    stable: Schema.Number,
+    nightly: Schema.Number,
+  }),
   versions: Schema.Array(T3CodeWebVersion),
 });
 
@@ -42,6 +47,13 @@ export type T3CodeWebChannel = typeof T3CodeWebChannel.Type;
 export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
   updateChannel: Schema.optional(T3CodeWebChannel),
   autoUpdate: Schema.optional(Schema.Boolean),
+  autoGc: Schema.optional(Schema.Boolean),
+  keepRecent: Schema.optional(
+    Schema.Struct({
+      stable: Schema.Number,
+      nightly: Schema.Number,
+    }),
+  ),
 });
 
 export type UpdateT3CodeWebSettingsRequest = typeof UpdateT3CodeWebSettingsRequest.Type;

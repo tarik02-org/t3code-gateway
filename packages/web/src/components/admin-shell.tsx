@@ -102,6 +102,8 @@ function T3CodeUpdatesDialog({
   const queryClient = useQueryClient();
   const [updateChannel, setUpdateChannel] = useState<T3CodeWebChannel>("nightly");
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const [autoGc, setAutoGc] = useState(false);
+  const [keepRecent, setKeepRecent] = useState({ stable: 2, nightly: 2 });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
@@ -201,13 +203,25 @@ function T3CodeUpdatesDialog({
     },
   });
 
-  const saveDraft = (nextUpdateChannel: T3CodeWebChannel, nextAutoUpdate: boolean) => {
+  const saveDraft = (
+    nextUpdateChannel: T3CodeWebChannel,
+    nextAutoUpdate: boolean,
+    nextAutoGc = autoGc,
+    nextKeepRecent = keepRecent,
+  ) => {
     setUpdateChannel(nextUpdateChannel);
     setAutoUpdate(nextAutoUpdate);
+    setAutoGc(nextAutoGc);
+    setKeepRecent(nextKeepRecent);
     setMessage("Saving...");
     setError(null);
     setUpdateResult(null);
-    settingsMutation.mutate({ updateChannel: nextUpdateChannel, autoUpdate: nextAutoUpdate });
+    settingsMutation.mutate({
+      updateChannel: nextUpdateChannel,
+      autoUpdate: nextAutoUpdate,
+      autoGc: nextAutoGc,
+      keepRecent: nextKeepRecent,
+    });
   };
 
   return (
@@ -218,6 +232,8 @@ function T3CodeUpdatesDialog({
           if (nextOpen && settings !== undefined) {
             setUpdateChannel(settings.updateChannel);
             setAutoUpdate(settings.autoUpdate);
+            setAutoGc(settings.autoGc);
+            setKeepRecent(settings.keepRecent);
             setMessage(null);
             setError(null);
             setUpdateResult(null);
@@ -351,40 +367,116 @@ function T3CodeUpdatesDialog({
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="t3code-auto-update">Automatic updates</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Check GitHub periodically for the selected channel.
-                  </p>
-                </div>
-                <Switch
-                  id="t3code-auto-update"
-                  checked={autoUpdate}
-                  onCheckedChange={(checked) => saveDraft(updateChannel, checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3 border-t pt-3">
-                <div className="flex flex-col gap-1">
-                  <Label>Update channel</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Automatic updates download and switch within this channel.
-                  </p>
-                </div>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  value={updateChannel}
-                  onValueChange={(value) => {
-                    if (value === "stable" || value === "nightly") {
-                      saveDraft(value, autoUpdate);
+              <div className="flex flex-col gap-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="t3code-auto-update">Automatic updates</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Check GitHub periodically for the selected channel.
+                    </p>
+                  </div>
+                  <Switch
+                    id="t3code-auto-update"
+                    checked={autoUpdate}
+                    onCheckedChange={(checked) =>
+                      saveDraft(updateChannel, checked, autoGc, keepRecent)
                     }
-                  }}
-                  aria-label="Automatic update channel"
-                >
-                  <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
-                  <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
-                </ToggleGroup>
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t pt-3">
+                  <div className="flex flex-col gap-1">
+                    <Label>Update channel</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatic updates download and switch within this channel.
+                    </p>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={updateChannel}
+                    onValueChange={(value) => {
+                      if (value === "stable" || value === "nightly") {
+                        saveDraft(value, autoUpdate, autoGc, keepRecent);
+                      }
+                    }}
+                    aria-label="Automatic update channel"
+                  >
+                    <ToggleGroupItem value="stable">Stable</ToggleGroupItem>
+                    <ToggleGroupItem value="nightly">Nightly</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t pt-3">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="t3code-auto-gc">Automatic GC</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Remove old unpinned downloads during the periodic update check.
+                    </p>
+                  </div>
+                  <Switch
+                    id="t3code-auto-gc"
+                    checked={autoGc}
+                    onCheckedChange={(checked) =>
+                      saveDraft(updateChannel, autoUpdate, checked, keepRecent)
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-2 border-t pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <Label>Keep recent versions</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Per-channel downloaded versions kept by GC.
+                      </p>
+                    </div>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={gcMutation.isPending}
+                      onClick={() => gcMutation.mutate()}
+                    >
+                      <Trash2Icon data-icon="inline-start" />
+                      {gcMutation.isPending ? "Collecting..." : "GC now"}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Label className="flex items-center gap-2 text-xs">
+                      Stable
+                      <Input
+                        nativeInput
+                        type="number"
+                        min={0}
+                        value={keepRecent.stable}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          if (Number.isInteger(value) && value >= 0) {
+                            saveDraft(updateChannel, autoUpdate, autoGc, {
+                              ...keepRecent,
+                              stable: value,
+                            });
+                          }
+                        }}
+                      />
+                    </Label>
+                    <Label className="flex items-center gap-2 text-xs">
+                      Nightly
+                      <Input
+                        nativeInput
+                        type="number"
+                        min={0}
+                        value={keepRecent.nightly}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          if (Number.isInteger(value) && value >= 0) {
+                            saveDraft(updateChannel, autoUpdate, autoGc, {
+                              ...keepRecent,
+                              nightly: value,
+                            });
+                          }
+                        }}
+                      />
+                    </Label>
+                  </div>
+                </div>
               </div>
             </div>
           </DialogPanel>

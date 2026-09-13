@@ -33,6 +33,8 @@ const gatewayStatus = {
     available: true,
     updateChannel: "nightly",
     autoUpdate: false,
+    autoGc: false,
+    keepRecent: { stable: 2, nightly: 2 },
     versions: [
       {
         channel: "stable",
