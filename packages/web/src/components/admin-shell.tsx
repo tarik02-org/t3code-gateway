@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { PinIcon, PinOffIcon, PlayIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  PinIcon,
+  PinOffIcon,
+  PlayIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
@@ -59,10 +66,16 @@ export function AdminShell({
           Reset password
         </Button>
         {t3codeWeb?.available === true ? (
-          <Button size="xs" variant="outline" onClick={() => setUpdatesOpen(true)}>
-            <RefreshCwIcon data-icon="inline-start" />
-            T3 Code Versions
-          </Button>
+          <>
+            <Button size="xs" render={<a href="/" target="_blank" rel="noreferrer" />}>
+              <ExternalLinkIcon data-icon="inline-start" />
+              Open T3 Code
+            </Button>
+            <Button size="xs" variant="outline" onClick={() => setUpdatesOpen(true)}>
+              <RefreshCwIcon data-icon="inline-start" />
+              T3 Code Versions
+            </Button>
+          </>
         ) : null}
         {actions}
       </header>
