@@ -514,7 +514,7 @@ function RetentionInput({
           size="sm"
           type="text"
           inputMode="numeric"
-          className="w-16 text-center text-sm"
+          className="w-16 text-center [&_input]:text-center [&_input]:text-sm"
           value={String(value)}
           aria-label={`${label} versions to keep`}
           onChange={(event) => {
