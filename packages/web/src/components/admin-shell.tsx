@@ -105,8 +105,6 @@ function T3CodeUpdatesDialog({
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [autoGc, setAutoGc] = useState(false);
   const [keepRecent, setKeepRecent] = useState({ stable: 2, nightly: 2 });
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
   const [removeCandidate, setRemoveCandidate] = useState<{
     readonly channel: T3CodeWebChannel;
@@ -121,7 +119,6 @@ function T3CodeUpdatesDialog({
     mutationFn: updateT3CodeWebSettings,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      setError(null);
     },
     onError: (cause) => {
       toastManager.add({
@@ -135,7 +132,11 @@ function T3CodeUpdatesDialog({
   const checkMutation = useMutation({
     mutationFn: checkT3CodeWebUpdates,
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not check for updates.");
+      toastManager.add({
+        type: "error",
+        title: "Could not check for updates",
+        description: cause instanceof Error ? cause.message : "The update check failed.",
+      });
       setUpdateResult(null);
     },
     onSuccess: (nextStatus) => {
@@ -153,7 +154,6 @@ function T3CodeUpdatesDialog({
           .toSorted()
           .at(-1) ?? null;
       setUpdateResult(previousVersion === nextVersion ? "none" : "updated");
-      setError(null);
     },
   });
 
@@ -161,11 +161,13 @@ function T3CodeUpdatesDialog({
     mutationFn: activateT3CodeWebVersion,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      setMessage("Version activated and pinned.");
-      setError(null);
     },
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not activate that version.");
+      toastManager.add({
+        type: "error",
+        title: "Could not activate version",
+        description: cause instanceof Error ? cause.message : "The version could not be activated.",
+      });
     },
   });
 
@@ -173,11 +175,14 @@ function T3CodeUpdatesDialog({
     mutationFn: setT3CodeWebVersionPin,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      setMessage("Version pin updated.");
-      setError(null);
     },
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not update the version pin.");
+      toastManager.add({
+        type: "error",
+        title: "Could not update version pin",
+        description:
+          cause instanceof Error ? cause.message : "The version pin could not be updated.",
+      });
     },
   });
 
@@ -186,11 +191,13 @@ function T3CodeUpdatesDialog({
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
       setRemoveCandidate(null);
-      setMessage("Version removed.");
-      setError(null);
     },
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not remove that version.");
+      toastManager.add({
+        type: "error",
+        title: "Could not remove version",
+        description: cause instanceof Error ? cause.message : "The version could not be removed.",
+      });
     },
   });
 
@@ -198,11 +205,13 @@ function T3CodeUpdatesDialog({
     mutationFn: garbageCollectT3CodeWebVersions,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      setMessage("Unused versions removed.");
-      setError(null);
     },
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Could not remove unused versions.");
+      toastManager.add({
+        type: "error",
+        title: "Could not run garbage collection",
+        description: cause instanceof Error ? cause.message : "Garbage collection failed.",
+      });
     },
   });
 
@@ -216,7 +225,6 @@ function T3CodeUpdatesDialog({
     setAutoUpdate(nextAutoUpdate);
     setAutoGc(nextAutoGc);
     setKeepRecent(nextKeepRecent);
-    setError(null);
     setUpdateResult(null);
     settingsMutation.mutate({
       updateChannel: nextUpdateChannel,
@@ -236,8 +244,6 @@ function T3CodeUpdatesDialog({
             setAutoUpdate(settings.autoUpdate);
             setAutoGc(settings.autoGc);
             setKeepRecent(settings.keepRecent);
-            setMessage(null);
-            setError(null);
             setUpdateResult(null);
           }
           onOpenChange(nextOpen);
@@ -434,13 +440,6 @@ function T3CodeUpdatesDialog({
             </div>
           </DialogPanel>
           <DialogFooter>
-            <div className="flex-1 text-xs sm:mr-auto">
-              {error !== null ? (
-                <span className="text-destructive-foreground">{error}</span>
-              ) : message !== null ? (
-                <span className="text-success-foreground">{message}</span>
-              ) : null}
-            </div>
             <Button
               size="xs"
               type="button"
