@@ -61,6 +61,13 @@ pnpm install
 pnpm build
 ```
 
+### PR container images
+
+Add the `build-image` label to a same-repository pull request to build and publish
+`ghcr.io/tarik02-org/t3code-gateway:pr-<number>` without merging it. The image is
+rebuilt for every subsequent push while the label remains attached, and the workflow
+updates a pull request comment with the image reference. Fork pull requests are skipped.
+
 ## License
 
 MIT
