@@ -281,7 +281,6 @@ function T3CodeUpdatesDialog({
           <DialogPanel>
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <Label>Installed versions</Label>
                 <Table>
                   <TableHeader>
                     <TableRow>
