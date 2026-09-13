@@ -8,7 +8,7 @@ import {
   RefreshCwIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
 
@@ -113,6 +113,7 @@ function T3CodeUpdatesDialog({
   const [autoGc, setAutoGc] = useState(false);
   const [keepRecent, setKeepRecent] = useState({ stable: 2, nightly: 2 });
   const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
+  const settingsQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [removeCandidate, setRemoveCandidate] = useState<{
     readonly channel: T3CodeWebChannel;
     readonly version: string;
@@ -148,19 +149,24 @@ function T3CodeUpdatesDialog({
     },
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
-      const previousVersion =
+      const previousVersions = new Set(
         settings?.versions
           .filter((version) => version.channel === updateChannel)
-          .map((version) => version.version)
-          .toSorted()
-          .at(-1) ?? null;
-      const nextVersion =
-        nextStatus.t3codeWeb.versions
-          .filter((version) => version.channel === updateChannel)
-          .map((version) => version.version)
-          .toSorted()
-          .at(-1) ?? null;
-      setUpdateResult(previousVersion === nextVersion ? "none" : "updated");
+          .map((version) => version.version),
+      );
+      const nextVersions = nextStatus.t3codeWeb.versions.filter(
+        (version) => version.channel === updateChannel,
+      );
+      const previousActive = settings?.versions.find(
+        (version) => version.channel === updateChannel && version.active,
+      )?.version;
+      const nextActive = nextVersions.find((version) => version.active)?.version;
+      setUpdateResult(
+        nextActive !== previousActive ||
+          nextVersions.some((version) => !previousVersions.has(version.version))
+          ? "updated"
+          : "none",
+      );
     },
   });
 
@@ -213,6 +219,7 @@ function T3CodeUpdatesDialog({
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
       setRemoveCandidate(null);
+      void releasesQuery.refetch();
     },
     onError: (cause) => {
       toastManager.add({
@@ -227,6 +234,7 @@ function T3CodeUpdatesDialog({
     mutationFn: garbageCollectT3CodeWebVersions,
     onSuccess: (nextStatus) => {
       applyStatus(nextStatus);
+      void releasesQuery.refetch();
     },
     onError: (cause) => {
       toastManager.add({
@@ -248,12 +256,17 @@ function T3CodeUpdatesDialog({
     setAutoGc(nextAutoGc);
     setKeepRecent(nextKeepRecent);
     setUpdateResult(null);
-    settingsMutation.mutate({
-      updateChannel: nextUpdateChannel,
-      autoUpdate: nextAutoUpdate,
-      autoGc: nextAutoGc,
-      keepRecent: nextKeepRecent,
-    });
+    settingsQueue.current = settingsQueue.current
+      .catch(() => undefined)
+      .then(() =>
+        settingsMutation.mutateAsync({
+          updateChannel: nextUpdateChannel,
+          autoUpdate: nextAutoUpdate,
+          autoGc: nextAutoGc,
+          keepRecent: nextKeepRecent,
+        }),
+      )
+      .catch(() => undefined);
   };
 
   return (
@@ -414,7 +427,7 @@ function T3CodeUpdatesDialog({
                         : updateResult === "updated"
                           ? "Updated"
                           : updateResult === "none"
-                            ? "No updates"
+                            ? "No updates available"
                             : "Check now"}
                     </Button>
                     <Switch

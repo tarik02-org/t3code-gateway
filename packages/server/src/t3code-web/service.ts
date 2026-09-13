@@ -22,6 +22,10 @@ import { GatewayRuntimeConfig } from "../config.ts";
 import { SettingsRepository } from "../db/settings-repository.ts";
 
 const channels = ["stable", "nightly"] as const;
+const versionCollator = new Intl.Collator("en-US", {
+  numeric: true,
+  sensitivity: "base",
+});
 
 const GitHubRelease = Schema.Struct({
   tag_name: Schema.String,
@@ -79,7 +83,9 @@ const selectPreferred = (records: ReadonlyArray<VersionRecord>, pinnedVersion: s
   if (pinned !== undefined) {
     return pinned;
   }
-  return records.toSorted((left, right) => left.version.localeCompare(right.version)).at(-1);
+  return records
+    .toSorted((left, right) => versionCollator.compare(left.version, right.version))
+    .at(-1);
 };
 
 export class T3CodeWebService extends Context.Service<
@@ -210,7 +216,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
         }))
         .toSorted((left, right) =>
           left.channel === right.channel
-            ? right.version.localeCompare(left.version)
+            ? versionCollator.compare(right.version, left.version)
             : left.channel.localeCompare(right.channel),
         ),
     } satisfies GatewayStatus["t3codeWeb"];
@@ -226,8 +232,20 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const initialize = Effect.fn("T3CodeWebService.initialize")(function* () {
     yield* fs.makeDirectory(downloadedRoot, { recursive: true });
     const current = yield* readSettings;
-    const records = yield* listChannelVersions(current.updateChannel);
-    const preferred = selectPreferred(records, current.pinnedVersions[current.updateChannel]);
+    const active = yield* activeTarget().pipe(
+      Effect.catchTag("PlatformError", () => Effect.succeed(null)),
+    );
+    const records: Array<VersionRecord> = [];
+    for (const channel of channels) {
+      records.push(...(yield* listChannelVersions(channel)));
+    }
+    if (active !== null && records.some((record) => record.root === active)) {
+      return;
+    }
+    const preferred = selectPreferred(
+      records.filter((record) => record.channel === current.updateChannel),
+      current.pinnedVersions[current.updateChannel],
+    );
     if (preferred !== undefined) {
       yield* activateRoot(preferred.root).pipe(
         Effect.catchTag("PlatformError", () =>
@@ -505,7 +523,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       const records = yield* listChannelVersions(channel);
       const recentDownloaded = records
         .filter((record) => record.source === "downloaded")
-        .toSorted((left, right) => right.version.localeCompare(left.version))
+        .toSorted((left, right) => versionCollator.compare(right.version, left.version))
         .slice(0, current.keepRecent[channel]);
       const recentVersions = new Set(recentDownloaded.map((record) => record.version));
       for (const record of records) {
