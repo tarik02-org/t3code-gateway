@@ -1,5 +1,16 @@
 # @t3code-gateway/server
 
+## 0.2.0
+
+### Minor Changes
+
+- 3554454: Support bundled stable and nightly T3 Code Web versions, with pinning, garbage collection, opt-in GitHub updates, and version management in the admin UI.
+
+### Patch Changes
+
+- Updated dependencies [3554454]
+  - @t3code-gateway/contracts@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes
