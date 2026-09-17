@@ -1,5 +1,23 @@
 # @t3code-gateway/server
 
+## 0.3.0
+
+### Minor Changes
+
+- e3a3dba: Support a GitHub token for T3 Code Web update checks. Set it in the admin UI (T3 Code Versions)
+  or with `T3_GATEWAY_GITHUB_TOKEN` during deployment; the UI value wins when both are set. The UI
+  value is encrypted at rest with the gateway secret key, like environment tokens. A token
+  with no scopes is enough and raises the GitHub API quota from 60 to 5,000 requests per hour.
+
+### Patch Changes
+
+- b34e765: Fix T3 Code Web updates failing with "Could not install the T3 Code Web update". The release
+  archive nests everything under a `dist/` directory, and the entry for that directory itself
+  resolved to the extraction directory, so the first write of every download hit `EISDIR` and
+  left an empty staging directory behind. Directory entries are now skipped.
+- Updated dependencies [e3a3dba]
+  - @t3code-gateway/contracts@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

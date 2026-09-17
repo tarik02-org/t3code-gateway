@@ -1,5 +1,22 @@
 # @t3code-gateway/web
 
+## 0.3.0
+
+### Minor Changes
+
+- e3a3dba: Support a GitHub token for T3 Code Web update checks. Set it in the admin UI (T3 Code Versions)
+  or with `T3_GATEWAY_GITHUB_TOKEN` during deployment; the UI value wins when both are set. The UI
+  value is encrypted at rest with the gateway secret key, like environment tokens. A token
+  with no scopes is enough and raises the GitHub API quota from 60 to 5,000 requests per hour.
+
+### Patch Changes
+
+- adc5b4b: Show notifications above open dialogs. The toast viewport shared its stacking level with the
+  dialog backdrop, so a toast raised while a dialog was open was painted behind the overlay and
+  appeared dimmed and unclickable.
+- Updated dependencies [e3a3dba]
+  - @t3code-gateway/contracts@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
