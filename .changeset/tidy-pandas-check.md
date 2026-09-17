@@ -1,8 +1,8 @@
+---
 "@t3code-gateway/contracts": minor
 "@t3code-gateway/screenshots": minor
 "@t3code-gateway/server": minor
 "@t3code-gateway/web": minor
-
 ---
 
 Support a GitHub token for T3 Code Web update checks. Set it in the admin UI (T3 Code Versions)
