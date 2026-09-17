@@ -35,6 +35,7 @@ export const GatewayConfig = Config.all({
   t3codeWebRepository: Config.string("T3_GATEWAY_T3CODE_WEB_REPOSITORY").pipe(
     Config.withDefault("tarik02-org/t3code"),
   ),
+  githubToken: Config.redacted("T3_GATEWAY_GITHUB_TOKEN").pipe(Config.option),
 });
 
 export type GatewayConfig = Config.Success<typeof GatewayConfig>;

@@ -29,6 +29,7 @@ export const T3CodeWebStatus = Schema.Struct({
   updateChannel: Schema.Literals(["stable", "nightly"]),
   autoUpdate: Schema.Boolean,
   autoGc: Schema.Boolean,
+  githubTokenConfigured: Schema.Boolean,
   keepRecent: Schema.Struct({
     stable: T3CodeWebRetentionCount,
     nightly: T3CodeWebRetentionCount,
@@ -57,6 +58,7 @@ export const UpdateT3CodeWebSettingsRequest = Schema.Struct({
   updateChannel: Schema.optional(T3CodeWebChannel),
   autoUpdate: Schema.optional(Schema.Boolean),
   autoGc: Schema.optional(Schema.Boolean),
+  githubToken: Schema.optional(Schema.String),
   keepRecent: Schema.optional(
     Schema.Struct({
       stable: T3CodeWebRetentionCount,

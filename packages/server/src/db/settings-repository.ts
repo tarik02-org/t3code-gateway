@@ -20,6 +20,8 @@ const PINNED_VERSION_KEYS = {
   stable: "t3code.web.pinned.stable",
   nightly: "t3code.web.pinned.nightly",
 } as const;
+const GITHUB_TOKEN_KEY = "t3code.web.githubToken";
+// Stored as base64 AES-256-GCM ciphertext (see SecretEncryption) or "" when unset.
 const KEEP_RECENT_KEYS = {
   stable: "t3code.web.keepRecent.stable",
   nightly: "t3code.web.keepRecent.nightly",
@@ -46,6 +48,7 @@ export type GatewaySettings = {
     readonly stable: string | null;
     readonly nightly: string | null;
   };
+  readonly githubToken: string | null;
   readonly updatedAt: string;
 };
 
@@ -64,6 +67,7 @@ const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, Da
       const nightlyKeepRecent = settings.find(
         (setting) => setting.key === KEEP_RECENT_KEYS.nightly,
       );
+      const githubToken = settings.find((setting) => setting.key === GITHUB_TOKEN_KEY);
       if (
         updateChannel === undefined ||
         autoUpdate === undefined ||
@@ -110,6 +114,8 @@ const decodeGatewaySettings = (rows: unknown): Effect.Effect<GatewaySettings, Da
             stable: stablePin.value === "" ? null : stablePin.value,
             nightly: nightlyPin.value === "" ? null : nightlyPin.value,
           },
+          githubToken:
+            githubToken === undefined || githubToken.value === "" ? null : githubToken.value,
           updatedAt:
             updateChannel.updatedAt > autoUpdate.updatedAt
               ? updateChannel.updatedAt
@@ -130,6 +136,7 @@ export class SettingsRepository extends Context.Service<
         readonly updatedAt: string;
         readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
         readonly keepRecent?: Partial<GatewaySettings["keepRecent"]>;
+        readonly githubToken?: string | null;
       },
     ) => Effect.Effect<GatewaySettings, DatabaseError>;
   }
@@ -154,6 +161,7 @@ export const make = Effect.gen(function* () {
       readonly updatedAt: string;
       readonly pinnedVersions?: Partial<GatewaySettings["pinnedVersions"]>;
       readonly keepRecent?: Partial<GatewaySettings["keepRecent"]>;
+      readonly githubToken?: string | null;
     },
   ) =>
     Effect.gen(function* () {
@@ -208,6 +216,15 @@ export const make = Effect.gen(function* () {
               {
                 key: KEEP_RECENT_KEYS.nightly,
                 value: String(input.keepRecent.nightly),
+                updatedAt: input.updatedAt,
+              },
+            ]),
+        ...(input.githubToken === undefined
+          ? []
+          : [
+              {
+                key: GITHUB_TOKEN_KEY,
+                value: input.githubToken ?? "",
                 updatedAt: input.updatedAt,
               },
             ]),
