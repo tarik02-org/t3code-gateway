@@ -29,6 +29,7 @@ import { Switch } from "./ui/switch.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group.tsx";
 import { toastManager } from "./ui/toast.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip.tsx";
 import { T3Logo } from "./logo.tsx";
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 import {
@@ -311,6 +312,7 @@ function T3CodeUpdatesDialog({
                       <TableHead>Version</TableHead>
                       <TableHead>Channel</TableHead>
                       <TableHead>Pinned</TableHead>
+                      <TableHead />
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -319,73 +321,88 @@ function T3CodeUpdatesDialog({
                     (releasesQuery.data?.filter((release) => !release.installed).length ?? 0) ===
                       0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-muted-foreground">
+                        <TableCell colSpan={5} className="text-muted-foreground">
                           No T3 Code versions are installed.
                         </TableCell>
                       </TableRow>
                     ) : null}
-                    {(settings?.versions ?? []).map((version) => (
-                      <TableRow key={`${version.channel}:${version.version}`}>
-                        <TableCell className="font-mono text-xs">{version.version}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
+                    {(settings?.versions ?? []).map((version) => {
+                      const removeBlockedReason = version.pinned
+                        ? "Pinned versions cannot be removed."
+                        : version.active
+                          ? "The active version cannot be removed."
+                          : null;
+                      const removeButton = (
+                        <Button
+                          size="xs"
+                          variant="destructive"
+                          disabled={removeBlockedReason !== null || removeMutation.isPending}
+                          onClick={() =>
+                            setRemoveCandidate({
+                              channel: version.channel,
+                              version: version.version,
+                            })
+                          }
+                        >
+                          <Trash2Icon data-icon="inline-start" />
+                          Remove
+                        </Button>
+                      );
+
+                      return (
+                        <TableRow key={`${version.channel}:${version.version}`}>
+                          <TableCell className="font-mono text-xs">{version.version}</TableCell>
+                          <TableCell>
                             <Badge variant="outline">{version.channel}</Badge>
-                            {version.forcedPinned ? (
-                              <Badge variant="secondary">Bundled</Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={version.pinned}
-                            disabled={version.forcedPinned || pinMutation.isPending}
-                            aria-label={`Pin ${version.version}`}
-                            onCheckedChange={(checked) =>
-                              pinMutation.mutate({
-                                channel: version.channel,
-                                version: checked ? version.version : null,
-                              })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              size="xs"
-                              variant={version.active ? "default" : "outline"}
-                              disabled={version.active || activateMutation.isPending}
-                              onClick={() =>
-                                activateMutation.mutate({
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={version.pinned}
+                              disabled={version.forcedPinned || pinMutation.isPending}
+                              aria-label={`Pin ${version.version}`}
+                              onCheckedChange={(checked) =>
+                                pinMutation.mutate({
                                   channel: version.channel,
-                                  version: version.version,
+                                  version: checked ? version.version : null,
                                 })
                               }
-                            >
-                              <PlayIcon data-icon="inline-start" />
-                              {version.active ? "Active" : "Activate"}
-                            </Button>
-                            {version.source === "downloaded" &&
-                            !version.active &&
-                            !version.pinned ? (
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {version.forcedPinned ? (
+                              <Badge variant="secondary">Bundled</Badge>
+                            ) : removeBlockedReason === null ? (
+                              removeButton
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger render={<span className="inline-flex" />}>
+                                  {removeButton}
+                                </TooltipTrigger>
+                                <TooltipContent>{removeBlockedReason}</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end">
                               <Button
                                 size="xs"
-                                variant="destructive"
-                                disabled={removeMutation.isPending}
+                                variant={version.active ? "default" : "outline"}
+                                disabled={version.active || activateMutation.isPending}
                                 onClick={() =>
-                                  setRemoveCandidate({
+                                  activateMutation.mutate({
                                     channel: version.channel,
                                     version: version.version,
                                   })
                                 }
                               >
-                                <Trash2Icon data-icon="inline-start" />
-                                Remove
+                                <PlayIcon data-icon="inline-start" />
+                                {version.active ? "Active" : "Activate"}
                               </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {(releasesQuery.data ?? [])
                       .filter((release) => !release.installed)
                       .map((release) => (
@@ -395,6 +412,7 @@ function T3CodeUpdatesDialog({
                             <Badge variant="outline">{release.channel}</Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground">—</TableCell>
+                          <TableCell />
                           <TableCell>
                             <div className="flex justify-end">
                               <Button
