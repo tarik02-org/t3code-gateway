@@ -424,7 +424,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
         return yield* storageFailure("The T3 Code Web update contained an invalid archive layout");
       }
       const relativeEntry = entry.slice(root.length);
-      if (relativeEntry.endsWith("/")) {
+      if (relativeEntry === "" || relativeEntry.endsWith("/")) {
         continue;
       }
       const output = yield* zipEntryPath(relativeEntry, temporary, path);
