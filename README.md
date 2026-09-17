@@ -51,6 +51,12 @@ updates, or check for an update immediately.
 GitHub-backed automatic updates are disabled by default; downloaded builds are stored in the gateway
 data volume.
 
+Update checks call the GitHub API, which allows 60 unauthenticated requests per hour per IP. Set a
+token with no scopes in the `T3 Code Versions` dialog, or pass `T3_GATEWAY_GITHUB_TOKEN` to the
+container (for example from a secret), to raise the quota to 5,000 requests per hour. The dialog
+value is encrypted at rest with the gateway secret key, like environment tokens. When both are
+set, the admin UI value wins; clearing it falls back to the environment variable.
+
 Use an external Traefik instance with `/data/traefik/environments.yml`, or enable the bundled one
 with `T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED=true` and expose ports `80` and `443`.
 

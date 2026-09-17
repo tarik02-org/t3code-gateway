@@ -112,6 +112,7 @@ function T3CodeUpdatesDialog({
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [autoGc, setAutoGc] = useState(false);
   const [keepRecent, setKeepRecent] = useState({ stable: 2, nightly: 2 });
+  const [githubToken, setGithubToken] = useState("");
   const [updateResult, setUpdateResult] = useState<"updated" | "none" | null>(null);
   const settingsQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [removeCandidate, setRemoveCandidate] = useState<{
@@ -245,6 +246,15 @@ function T3CodeUpdatesDialog({
     },
   });
 
+  const saveToken = (nextGithubToken: string) => {
+    setGithubToken("");
+    setUpdateResult(null);
+    settingsQueue.current = settingsQueue.current
+      .catch(() => undefined)
+      .then(() => settingsMutation.mutateAsync({ githubToken: nextGithubToken }))
+      .catch(() => undefined);
+  };
+
   const saveDraft = (
     nextUpdateChannel: T3CodeWebChannel,
     nextAutoUpdate: boolean,
@@ -279,6 +289,7 @@ function T3CodeUpdatesDialog({
             setAutoUpdate(settings.autoUpdate);
             setAutoGc(settings.autoGc);
             setKeepRecent(settings.keepRecent);
+            setGithubToken("");
             setUpdateResult(null);
           }
           onOpenChange(nextOpen);
@@ -515,6 +526,48 @@ function T3CodeUpdatesDialog({
                         })
                       }
                     />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t pt-3">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="t3code-github-token">GitHub token</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {settings?.githubTokenConfigured === true
+                        ? "A token is configured; update checks use the higher API quota."
+                        : "Not configured; update checks share 60 GitHub API requests per hour."}{" "}
+                      A token with no scopes is enough. Deployments can set T3_GATEWAY_GITHUB_TOKEN
+                      instead.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Input
+                      id="t3code-github-token"
+                      type="password"
+                      autoComplete="off"
+                      placeholder="ghp_…"
+                      className="w-44 font-mono"
+                      value={githubToken}
+                      disabled={settingsMutation.isPending}
+                      onChange={(event) => setGithubToken(event.target.value)}
+                    />
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={githubToken === "" || settingsMutation.isPending}
+                      onClick={() => saveToken(githubToken)}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      disabled={
+                        settings?.githubTokenConfigured !== true || settingsMutation.isPending
+                      }
+                      onClick={() => saveToken("")}
+                    >
+                      Clear
+                    </Button>
                   </div>
                 </div>
               </div>

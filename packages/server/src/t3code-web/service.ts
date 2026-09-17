@@ -6,6 +6,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 
@@ -19,6 +20,7 @@ import type {
 import { T3CodeWebFailure } from "@t3code-gateway/contracts/schemas";
 
 import { GatewayRuntimeConfig } from "../config.ts";
+import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { SettingsRepository } from "../db/settings-repository.ts";
 
 const channels = ["stable", "nightly"] as const;
@@ -124,6 +126,7 @@ export class T3CodeWebService extends Context.Service<
 const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const config = yield* GatewayRuntimeConfig;
   const settings = yield* SettingsRepository;
+  const secrets = yield* SecretEncryption;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const client = yield* HttpClient.HttpClient;
@@ -139,6 +142,45 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       Effect.fail(storageFailure("Could not read T3 Code Web settings")),
     ),
   );
+
+  const hasEnvGithubToken = () =>
+    Option.match(config.githubToken, {
+      onNone: () => false,
+      onSome: (token) => Redacted.value(token) !== "",
+    });
+
+  const resolveEnvGithubToken = () => {
+    const fromEnv = Option.getOrNull(config.githubToken);
+    if (fromEnv === null) {
+      return null;
+    }
+    const value = Redacted.value(fromEnv);
+    return value === "" ? null : value;
+  };
+
+  const resolveGithubToken = (stored: string | null) => {
+    if (stored === null || stored === "") {
+      return Effect.succeed(resolveEnvGithubToken());
+    }
+    return decryptGithubToken(stored);
+  };
+
+  const encryptGithubToken = (token: string) =>
+    secrets.encrypt(token).pipe(
+      Effect.map((encrypted) => encrypted.toString("base64")),
+      Effect.catchTag("SecretEncryptionError", () =>
+        Effect.fail(storageFailure("Could not save the GitHub token")),
+      ),
+    );
+
+  const decryptGithubToken = (stored: string) =>
+    secrets
+      .decrypt(Buffer.from(stored, "base64"))
+      .pipe(
+        Effect.catchTag("SecretEncryptionError", () =>
+          Effect.fail(storageFailure("Could not read the GitHub token")),
+        ),
+      );
 
   const listChannelVersions = Effect.fn("T3CodeWebService.listChannelVersions")(function* (
     channel: T3CodeWebChannel,
@@ -202,6 +244,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       updateChannel: current.updateChannel,
       autoUpdate: current.autoUpdate,
       autoGc: current.autoGc,
+      githubTokenConfigured:
+        (current.githubToken !== null && current.githubToken !== "") || hasEnvGithubToken(),
       keepRecent: current.keepRecent,
       versions: records
         .map((record) => ({
@@ -262,14 +306,17 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
       channel === "stable"
         ? `https://api.github.com/repos/${config.t3codeWebRepository}/releases/latest`
         : `https://api.github.com/repos/${config.t3codeWebRepository}/releases?per_page=20`;
+    const token = yield* resolveGithubToken((yield* readSettings).githubToken);
+    const headers: Record<string, string> = {
+      accept: "application/vnd.github+json",
+      "user-agent": "t3code-gateway",
+      "x-github-api-version": "2022-11-28",
+    };
+    if (token !== null) {
+      headers["authorization"] = `Bearer ${token}`;
+    }
     const response = yield* client
-      .get(releasesUrl, {
-        headers: {
-          accept: "application/vnd.github+json",
-          "user-agent": "t3code-gateway",
-          "x-github-api-version": "2022-11-28",
-        },
-      })
+      .get(releasesUrl, { headers })
       .pipe(
         Effect.catchTag("HttpClientError", () =>
           Effect.fail(storageFailure("Could not check GitHub for T3 Code updates")),
@@ -428,11 +475,18 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const updateSettings = Effect.fn("T3CodeWebService.updateSettings")(function* (
     input: UpdateT3CodeWebSettingsRequest,
   ) {
+    const githubToken =
+      input.githubToken === undefined
+        ? undefined
+        : input.githubToken === ""
+          ? null
+          : yield* encryptGithubToken(input.githubToken);
     const nextSettings = {
       updatedAt: DateTime.formatIso(yield* DateTime.now),
       ...(input.updateChannel === undefined ? {} : { updateChannel: input.updateChannel }),
       ...(input.autoUpdate === undefined ? {} : { autoUpdate: input.autoUpdate }),
       ...(input.autoGc === undefined ? {} : { autoGc: input.autoGc }),
+      ...(githubToken === undefined ? {} : { githubToken }),
       ...(input.keepRecent === undefined ? {} : { keepRecent: input.keepRecent }),
     };
     yield* settings

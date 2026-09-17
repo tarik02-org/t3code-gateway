@@ -79,6 +79,7 @@ const environmentLiveLayer = environmentServiceLayer.pipe(
 
 const t3codeWebLiveLayer = T3CodeWebServiceLive.pipe(
   Layer.provide(settingsRepositoryLiveLayer),
+  Layer.provide(secretLiveLayer),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(foundationLayer),
 );
