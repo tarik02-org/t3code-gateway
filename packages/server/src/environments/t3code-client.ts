@@ -1,5 +1,6 @@
 import type {
   EnvironmentClientSession,
+  EnvironmentMcpStatus,
   RevokeEnvironmentClientResponse,
 } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
@@ -11,6 +12,7 @@ import type * as HttpClientError from "effect/unstable/http/HttpClientError";
 import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import * as Schema from "effect/Schema";
 
+import { GATEWAY_VERSION } from "../version.ts";
 import { joinBaseUrl } from "./urls.ts";
 
 const ENVIRONMENT_DESCRIPTOR_PATH = "/.well-known/t3/environment";
@@ -18,6 +20,10 @@ const OAUTH_TOKEN_PATH = "/oauth/token";
 const CLIENTS_PATH = "/api/auth/clients";
 const CLIENTS_REVOKE_PATH = "/api/auth/clients/revoke";
 const PAIRING_TOKEN_PATH = "/api/auth/pairing-token";
+const MCP_PATH = "/mcp";
+const MCP_PROTOCOL_VERSION = "2025-06-18";
+// T3 Code marks the tools that serve callers outside T3 Code with this `_meta` key.
+const EXTERNAL_CALLER_TOOL_META_KEY = "t3code/externalCaller";
 
 const EnvironmentClientMetadataDeviceType = Schema.Literals([
   "desktop",
@@ -489,4 +495,154 @@ export const readEnvironmentLabel = (descriptor: unknown) => {
   }
 
   return descriptor.label;
+};
+
+const McpToolsListResponse = Schema.Struct({
+  result: Schema.Struct({
+    tools: Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        meta: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+      }).pipe(Schema.encodeKeys({ meta: "_meta" })),
+    ),
+    nextCursor: Schema.optional(Schema.String),
+  }),
+});
+
+const decodeMcpToolsListResponse = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(McpToolsListResponse),
+);
+
+/** A JSON-RPC reply arrives as plain JSON or as the last `data:` line of an event stream. */
+const mcpReplyText = (response: HttpClientResponse.HttpClientResponse, body: string) => {
+  if (!(response.headers["content-type"] ?? "").includes("text/event-stream")) {
+    return body;
+  }
+  const dataLines = body.split("\n").filter((line) => line.startsWith("data:"));
+  return dataLines.at(-1)?.slice("data:".length).trim() ?? "";
+};
+
+const mcpUnavailable = (message: string): EnvironmentMcpStatus => ({
+  _tag: "Unavailable",
+  message,
+});
+
+/**
+ * Opens an MCP session on the environment with the gateway's admin token and
+ * counts the tools that serve external callers. Older T3 Code builds accept
+ * only their own agents' credentials on `/mcp` and answer 401.
+ */
+export const probeExternalMcp = (
+  client: HttpClient.HttpClient,
+  internalHttpBaseUrl: string,
+  adminBearerToken: string,
+): Effect.Effect<EnvironmentMcpStatus> => {
+  const url = joinBaseUrl(internalHttpBaseUrl, MCP_PATH);
+  const post = (headers: Record<string, string>, message: unknown) =>
+    client.post(url, {
+      headers: {
+        ...bearerAuthHeaders(adminBearerToken),
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json",
+        ...headers,
+      },
+      body: HttpBody.jsonUnsafe(message),
+    });
+
+  const listExternalTools = (sessionHeaders: Record<string, string>) =>
+    Effect.gen(function* () {
+      let count = 0;
+      let cursor: string | undefined;
+      let requestId = 2;
+      do {
+        const response = yield* post(sessionHeaders, {
+          jsonrpc: "2.0",
+          id: requestId++,
+          method: "tools/list",
+          params: cursor === undefined ? {} : { cursor },
+        });
+        if (response.status !== 200) {
+          return yield* new EnvironmentFailure({
+            message: `MCP tool listing failed with status ${response.status}`,
+          });
+        }
+        const reply = yield* decodeMcpToolsListResponse(
+          mcpReplyText(response, yield* readResponseText(response)),
+        ).pipe(
+          Effect.catchTags({
+            SchemaError: () =>
+              Effect.fail(
+                new EnvironmentFailure({ message: "Environment returned an invalid tool list" }),
+              ),
+          }),
+        );
+        count += reply.result.tools.filter(
+          (tool) => tool.meta?.[EXTERNAL_CALLER_TOOL_META_KEY] === true,
+        ).length;
+        cursor = reply.result.nextCursor;
+      } while (cursor !== undefined);
+      return count;
+    });
+
+  return Effect.gen(function* () {
+    const initialized = yield* post(
+      {},
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "t3code-gateway", version: GATEWAY_VERSION },
+        },
+      },
+    );
+    switch (initialized.status) {
+      case 200:
+        break;
+      case 401:
+        // A token the environment accepts elsewhere means /mcp only serves T3 Code's own agents.
+        yield* listClientSessions(client, internalHttpBaseUrl, adminBearerToken);
+        return {
+          _tag: "Unsupported",
+          message: "This T3 Code version accepts only its own agents on its MCP endpoint.",
+        } satisfies EnvironmentMcpStatus;
+      case 404:
+        return {
+          _tag: "Unsupported",
+          message: "This T3 Code version has no MCP endpoint.",
+        } satisfies EnvironmentMcpStatus;
+      case 403:
+        return mcpUnavailable("The admin token does not grant orchestration:operate.");
+      default:
+        return mcpUnavailable(`MCP initialization failed with status ${initialized.status}`);
+    }
+
+    const sessionId = initialized.headers["mcp-session-id"];
+    const sessionHeaders: Record<string, string> = {
+      "mcp-protocol-version": MCP_PROTOCOL_VERSION,
+      ...(sessionId === undefined ? {} : { "mcp-session-id": sessionId }),
+    };
+    const closeSession =
+      sessionId === undefined
+        ? Effect.void
+        : client
+            .del(url, { headers: { ...bearerAuthHeaders(adminBearerToken), ...sessionHeaders } })
+            .pipe(Effect.ignore);
+
+    return yield* Effect.gen(function* () {
+      yield* post(sessionHeaders, { jsonrpc: "2.0", method: "notifications/initialized" });
+      const externalToolCount = yield* listExternalTools(sessionHeaders);
+      return { _tag: "Supported", externalToolCount } satisfies EnvironmentMcpStatus;
+    }).pipe(Effect.ensuring(closeSession));
+  }).pipe(
+    Effect.catchTags({
+      HttpClientError: (error) =>
+        Effect.succeed(
+          mcpUnavailable(environmentHttpClientFailureMessage("probe MCP endpoint", url, error)),
+        ),
+      EnvironmentFailure: (error) => Effect.succeed(mcpUnavailable(error.message)),
+    }),
+  );
 };

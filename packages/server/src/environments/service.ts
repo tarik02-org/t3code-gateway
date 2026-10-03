@@ -2,6 +2,7 @@ import type {
   CreateEnvironmentPairingLinkRequest,
   EnvironmentClientSession,
   EnvironmentInput,
+  EnvironmentMcpStatus,
   EnvironmentPairingLink,
   EnvironmentRecord,
   RevokeEnvironmentClientResponse,
@@ -35,6 +36,7 @@ import {
   createBearerTokenForClient,
   createPairingCredential,
   listClientSessions,
+  probeExternalMcp,
   revokeClientSession,
 } from "./t3code-client.ts";
 
@@ -77,6 +79,9 @@ export class EnvironmentService extends Context.Service<
       environmentId: string,
       sessionId: string,
     ) => Effect.Effect<RevokeEnvironmentClientResponse, EnvironmentFailure | DatabaseError>;
+    readonly probeMcp: (
+      environmentId: string,
+    ) => Effect.Effect<EnvironmentMcpStatus, EnvironmentFailure | DatabaseError>;
   }
 >()("@t3code-gateway/server/environments/service/EnvironmentService") {}
 
@@ -380,6 +385,25 @@ export const make = Effect.gen(function* () {
       );
     });
 
+  const probeMcp = (environmentId: string) =>
+    Effect.gen(function* () {
+      const row = yield* environmentRepository.findEnvironment(environmentId);
+
+      if (row === undefined) {
+        return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
+      }
+      if (!row.enabled) {
+        return { _tag: "Unavailable", message: "The environment is disabled." } as const;
+      }
+
+      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
+      if (adminBearerToken.length === 0) {
+        return yield* new EnvironmentFailure({ message: "Admin bearer token is required" });
+      }
+
+      return yield* probeExternalMcp(client, row.endpoint, adminBearerToken);
+    });
+
   const createPairingLink = (environmentId: string, input: CreateEnvironmentPairingLinkRequest) =>
     Effect.gen(function* () {
       if (input.label.length === 0) {
@@ -513,6 +537,7 @@ export const make = Effect.gen(function* () {
     createPairingLink,
     createT3CodeCatalogEntry,
     revokeClient,
+    probeMcp,
   });
 });
 

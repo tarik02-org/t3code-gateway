@@ -5,6 +5,7 @@ import type {
   CurrentUser,
   EnvironmentClientSession,
   EnvironmentInput,
+  EnvironmentMcpStatus,
   EnvironmentPairingLink,
   EnvironmentRecord,
   GatewayStatus,
@@ -193,4 +194,8 @@ export async function revokeEnvironmentClient(
   return runGatewayRpc((client) =>
     client["gateway.environments.clients.revoke"]({ environmentId, sessionId }),
   );
+}
+
+export async function probeEnvironmentMcp(environmentId: string): Promise<EnvironmentMcpStatus> {
+  return runGatewayRpc((client) => client["gateway.environments.mcp.probe"]({ environmentId }));
 }

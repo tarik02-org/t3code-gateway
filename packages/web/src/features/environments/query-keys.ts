@@ -5,3 +5,6 @@ export const IS_BROWSER = typeof window !== "undefined";
 
 export const environmentClientsQueryKey = (environmentId: string | undefined) =>
   ["gateway", "environments", environmentId, "clients"] as const;
+
+export const environmentMcpQueryKey = (environmentId: string) =>
+  ["gateway", "environments", environmentId, "mcp"] as const;

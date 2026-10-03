@@ -1,5 +1,5 @@
 import type { EnvironmentRecord } from "@t3code-gateway/contracts/schemas";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog } from "../../components/confirm-dialog.tsx";
@@ -16,10 +16,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import {
   createT3CodeCatalogEntry,
   deleteEnvironment,
+  probeEnvironmentMcp,
   updateEnvironment,
 } from "../../lib/gateway-api.ts";
 import { cn } from "../../lib/utils.ts";
-import { ENVIRONMENTS_QUERY_KEY } from "./query-keys.ts";
+import { ENVIRONMENTS_QUERY_KEY, environmentMcpQueryKey, IS_BROWSER } from "./query-keys.ts";
 import { useT3CodeCatalogPopoverStore } from "./t3code-catalog-popover-store.ts";
 import { useT3CodeCatalogStore } from "./t3code-catalog-store.ts";
 
@@ -49,7 +50,7 @@ export function EnvironmentTable({
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
+          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -59,6 +60,7 @@ export function EnvironmentTable({
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Admin token</th>
+            <th className="px-2 py-3 text-center font-medium">MCP</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -91,6 +93,9 @@ export function EnvironmentTable({
               </td>
               <td className="px-2 py-3 text-center">
                 <AdminTokenStatusBadge environment={environment} />
+              </td>
+              <td className="px-2 py-3 text-center">
+                <McpStatusBadge environment={environment} />
               </td>
               <td className="px-2 py-3 text-center">
                 <EnvironmentEnabledSwitch environment={environment} />
@@ -222,6 +227,62 @@ function AdminTokenStatusBadge({
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof Error ? cause.message : fallback;
 
+function McpStatusBadge({
+  environment,
+}: Readonly<{
+  environment: EnvironmentRecord;
+}>) {
+  const query = useQuery({
+    queryKey: environmentMcpQueryKey(environment.environmentId),
+    queryFn: () => probeEnvironmentMcp(environment.environmentId),
+    enabled: IS_BROWSER,
+    staleTime: 5 * 60 * 1_000,
+    retry: false,
+  });
+
+  if (query.isPending) {
+    return <Skeleton className="mx-auto h-5 w-20" />;
+  }
+
+  let label: string;
+  let variant: "default" | "destructive" | "ghost" | "outline" | "secondary";
+  let details: string;
+
+  if (query.isError) {
+    label = "Unavailable";
+    variant = "outline";
+    details = errorMessage(query.error, "Could not probe the MCP endpoint.");
+  } else {
+    const status = query.data;
+    switch (status["_tag"]) {
+      case "Supported":
+        label = "Available";
+        variant = "secondary";
+        details = `${status.externalToolCount} tools serve callers outside T3 Code.`;
+        break;
+      case "Unsupported":
+        label = "Unsupported";
+        variant = "ghost";
+        details = status.message;
+        break;
+      case "Unavailable":
+        label = "Unavailable";
+        variant = "outline";
+        details = status.message;
+        break;
+    }
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{details}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function EnvironmentEnabledSwitch({
   environment,
 }: Readonly<{
@@ -309,7 +370,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
+          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -319,6 +380,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Admin token</th>
+            <th className="px-2 py-3 text-center font-medium">MCP</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -335,6 +397,9 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
               </td>
               <td className="px-4 py-3">
                 <Skeleton className="h-4 w-64 max-w-full rounded-full" />
+              </td>
+              <td className="px-2 py-3">
+                <Skeleton className="mx-auto h-5 w-20 rounded-full" />
               </td>
               <td className="px-2 py-3">
                 <Skeleton className="mx-auto h-5 w-20 rounded-full" />
@@ -370,6 +435,7 @@ function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: bo
       <col className="w-[13%]" />
       <col />
       <col className="w-32" />
+      <col className="w-28" />
       <col className="w-18" />
       {showWebColumn ? <col className="w-16" /> : null}
       <col className="w-64" />

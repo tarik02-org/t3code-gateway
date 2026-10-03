@@ -14,6 +14,7 @@ import {
   EnvironmentClientSession,
   EnvironmentFailure,
   EnvironmentInput,
+  EnvironmentMcpStatus,
   EnvironmentPairingLink,
   EnvironmentRecord,
   GatewayStatus,
@@ -192,6 +193,12 @@ export class RevokeEnvironmentClient extends Rpc.make("gateway.environments.clie
   error: EnvironmentFailure,
 }).middleware(GatewaySessionMiddleware) {}
 
+export class ProbeEnvironmentMcp extends Rpc.make("gateway.environments.mcp.probe", {
+  payload: EnvironmentIdPayload,
+  success: EnvironmentMcpStatus,
+  error: EnvironmentFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
 export class GetTraefikConfig extends Rpc.make("gateway.traefik.config", {
   success: TraefikConfigResponse,
 }).middleware(GatewaySessionMiddleware) {}
@@ -211,6 +218,7 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateEnvironmentPairingLink,
   CreateT3CodeCatalogEntry,
   RevokeEnvironmentClient,
+  ProbeEnvironmentMcp,
   GetTraefikConfig,
   UpdateT3CodeWebSettings,
   CheckT3CodeWebUpdates,

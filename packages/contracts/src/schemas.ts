@@ -347,3 +347,19 @@ export const RevokeEnvironmentClientResponse = Schema.Struct({
 });
 
 export type RevokeEnvironmentClientResponse = typeof RevokeEnvironmentClientResponse.Type;
+
+/** Whether an environment's `/mcp` endpoint serves callers outside T3 Code, as the gateway relay is. */
+export const EnvironmentMcpStatus = Schema.Union([
+  Schema.TaggedStruct("Supported", {
+    externalToolCount: Schema.Number,
+  }),
+  // The server answers but rejects environment access tokens: a T3 Code build without external MCP access.
+  Schema.TaggedStruct("Unsupported", {
+    message: Schema.String,
+  }),
+  Schema.TaggedStruct("Unavailable", {
+    message: Schema.String,
+  }),
+]);
+
+export type EnvironmentMcpStatus = typeof EnvironmentMcpStatus.Type;

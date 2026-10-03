@@ -163,6 +163,9 @@ export const layer = GatewayRpcs.toLayer(
           .revokeClient(payload.environmentId, payload.sessionId)
           .pipe(Effect.catchTags(environmentRpcErrors)),
 
+      "gateway.environments.mcp.probe": (payload: EnvironmentIdPayload) =>
+        environments.probeMcp(payload.environmentId).pipe(Effect.catchTags(environmentRpcErrors)),
+
       "gateway.traefik.config": () => traefik.getConfig(),
     });
   }),
