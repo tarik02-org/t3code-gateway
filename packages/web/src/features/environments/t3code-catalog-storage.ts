@@ -9,13 +9,19 @@ const requiredStoreNames = ["catalog", "shell", "thread", "server-config", "vcs-
 const documentKey = "document";
 const gatewayPrefix = "gateway:";
 
-const CatalogDocumentSchema = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
-  targets: Schema.Array(Schema.Unknown),
-  profiles: Schema.Array(Schema.Unknown),
-  credentials: Schema.Array(Schema.Unknown),
-  remoteDpopTokens: Schema.Array(Schema.Unknown),
-});
+// T3 Code owns this document and keeps adding keys (githubRoutingPermissions, ...);
+// the rest record carries keys we don't know through our writes.
+const CatalogDocumentSchema = Schema.StructWithRest(
+  Schema.Struct({
+    schemaVersion: Schema.Literal(1),
+    targets: Schema.Array(Schema.Unknown),
+    profiles: Schema.Array(Schema.Unknown),
+    credentials: Schema.Array(Schema.Unknown),
+    remoteDpopTokens: Schema.Array(Schema.Unknown),
+    disabledEnvironmentIds: Schema.optionalKey(Schema.Array(Schema.String)),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
 
 type CatalogDocument = typeof CatalogDocumentSchema.Type;
 
@@ -146,11 +152,10 @@ export async function installT3CodeCatalogEntry(entry: T3CodeCatalogEntryRespons
   try {
     const catalog = parseCatalog(await readCatalog(database));
     await writeCatalog(database, {
-      schemaVersion: 1,
+      ...catalog,
       targets: upsertByConnectionId(catalog.targets, [entry.target]),
       profiles: upsertByConnectionId(catalog.profiles, [entry.profile]),
       credentials: upsertByConnectionId(catalog.credentials, [entry.credential]),
-      remoteDpopTokens: catalog.remoteDpopTokens,
     });
   } finally {
     database.close();
@@ -162,12 +167,18 @@ export async function removeT3CodeCatalogEnvironment(environmentId: string): Pro
   try {
     const catalog = parseCatalog(await readCatalog(database));
     const removedConnectionId = connectionId(environmentId);
+    const { disabledEnvironmentIds, ...rest } = catalog;
     await writeCatalog(database, {
-      schemaVersion: 1,
+      ...rest,
       targets: removeByConnectionId(catalog.targets, removedConnectionId),
       profiles: removeByConnectionId(catalog.profiles, removedConnectionId),
       credentials: removeByConnectionId(catalog.credentials, removedConnectionId),
-      remoteDpopTokens: catalog.remoteDpopTokens,
+      // Matches T3 Code: removing an environment also forgets that it was switched off.
+      ...(disabledEnvironmentIds === undefined
+        ? {}
+        : {
+            disabledEnvironmentIds: disabledEnvironmentIds.filter((id) => id !== environmentId),
+          }),
     });
   } finally {
     database.close();
