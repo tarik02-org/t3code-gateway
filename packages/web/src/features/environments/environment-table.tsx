@@ -1,4 +1,7 @@
-import type { EnvironmentRecord } from "@t3code-gateway/contracts/schemas";
+import type {
+  EnvironmentRecord,
+  McpUpstreamCredentialStatus,
+} from "@t3code-gateway/contracts/schemas";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
@@ -19,18 +22,21 @@ import {
   updateEnvironment,
 } from "../../lib/gateway-api.ts";
 import { cn } from "../../lib/utils.ts";
+import { mcpAccessTitle } from "../mcp/mcp-access.ts";
 import { ENVIRONMENTS_QUERY_KEY } from "./query-keys.ts";
 import { useT3CodeCatalogPopoverStore } from "./t3code-catalog-popover-store.ts";
 import { useT3CodeCatalogStore } from "./t3code-catalog-store.ts";
 
 export function EnvironmentTable({
   environments,
+  mcpCredentials,
   onEdit,
   onPair,
   onSessions,
   showWebColumn,
 }: Readonly<{
   environments: ReadonlyArray<EnvironmentRecord>;
+  mcpCredentials: ReadonlyArray<McpUpstreamCredentialStatus>;
   onEdit: (environment: EnvironmentRecord) => void;
   onPair: (environment: EnvironmentRecord) => void;
   onSessions: (environment: EnvironmentRecord) => void;
@@ -49,7 +55,7 @@ export function EnvironmentTable({
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
+          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -59,6 +65,7 @@ export function EnvironmentTable({
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Admin token</th>
+            <th className="px-2 py-3 text-center font-medium">MCP</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -91,6 +98,13 @@ export function EnvironmentTable({
               </td>
               <td className="px-2 py-3 text-center">
                 <AdminTokenStatusBadge environment={environment} />
+              </td>
+              <td className="px-2 py-3 text-center">
+                <McpStatusBadge
+                  credentials={mcpCredentials.filter(
+                    (credential) => credential.environmentId === environment.environmentId,
+                  )}
+                />
               </td>
               <td className="px-2 py-3 text-center">
                 <EnvironmentEnabledSwitch environment={environment} />
@@ -127,6 +141,57 @@ const formatDate = (value: string) =>
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+
+/** The gateway's own MCP sign-ins to an environment, one per access level agents use. */
+function McpStatusBadge({
+  credentials,
+}: Readonly<{
+  credentials: ReadonlyArray<McpUpstreamCredentialStatus>;
+}>) {
+  const failing = credentials.filter((credential) => credential.lastFailure !== null);
+  const signedOut = failing.some((credential) => credential.expiresAt === null);
+  const label =
+    credentials.length === 0
+      ? "Unused"
+      : failing.length === 0
+        ? "Signed in"
+        : signedOut
+          ? "Failing"
+          : "Retrying";
+  const variant =
+    credentials.length === 0
+      ? "ghost"
+      : failing.length === 0
+        ? "secondary"
+        : signedOut
+          ? "destructive"
+          : "outline";
+  const details =
+    credentials.length === 0 ? (
+      <p>The gateway signs in the first time an agent uses this environment over MCP.</p>
+    ) : (
+      <div className="flex flex-col gap-1">
+        {credentials.map((credential) => (
+          <p key={credential.access}>
+            {mcpAccessTitle(credential.access)}:{" "}
+            {credential.lastFailure ??
+              (credential.expiresAt === null
+                ? "not signed in"
+                : `renews before ${formatDate(credential.expiresAt)}`)}
+          </p>
+        ))}
+      </div>
+    );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipContent>{details}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function AdminTokenStatusBadge({
   environment,
@@ -309,7 +374,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1168px]" : "min-w-[1104px]",
+          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -319,6 +384,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
             <th className="px-4 py-3 font-medium">Slug</th>
             <th className="px-4 py-3 font-medium">Public URL</th>
             <th className="px-2 py-3 text-center font-medium">Admin token</th>
+            <th className="px-2 py-3 text-center font-medium">MCP</th>
             <th className="px-2 py-3 text-center font-medium">Enabled</th>
             {showWebColumn ? <th className="px-2 py-3 text-center font-medium">Web</th> : null}
             <th className="px-4 py-3 font-medium"></th>
@@ -338,6 +404,9 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
               </td>
               <td className="px-2 py-3">
                 <Skeleton className="mx-auto h-5 w-20 rounded-full" />
+              </td>
+              <td className="px-2 py-3">
+                <Skeleton className="mx-auto h-5 w-16 rounded-full" />
               </td>
               <td className="px-2 py-3">
                 <Skeleton className="mx-auto h-5 w-9 rounded-full" />
@@ -370,6 +439,7 @@ function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: bo
       <col className="w-[13%]" />
       <col />
       <col className="w-32" />
+      <col className="w-28" />
       <col className="w-18" />
       {showWebColumn ? <col className="w-16" /> : null}
       <col className="w-64" />

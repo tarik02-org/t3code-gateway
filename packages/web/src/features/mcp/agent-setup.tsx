@@ -60,6 +60,23 @@ export function AgentSetup({ mcpUrl, token }: Readonly<{ mcpUrl: string; token: 
       {snippet === undefined ? null : (
         <div className="space-y-2">
           <Caption text={snippet.caption} />
+          {snippet.fields === undefined ? null : (
+            <dl className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
+              {snippet.fields.map((field) => (
+                <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-3" key={field.label}>
+                  <dt className="w-44 shrink-0 text-xs text-muted-foreground">{field.label}</dt>
+                  <dd className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+                    {field.value}
+                  </dd>
+                  <CopyButton
+                    className="shrink-0"
+                    label={`Copy ${field.label}`}
+                    value={field.value}
+                  />
+                </div>
+              ))}
+            </dl>
+          )}
           <div className="flex items-start gap-1 rounded-lg border border-input bg-muted/25 pr-1.5">
             <pre className="min-w-0 flex-1 overflow-x-auto p-3 font-mono text-xs leading-relaxed text-foreground">
               {snippet.code}

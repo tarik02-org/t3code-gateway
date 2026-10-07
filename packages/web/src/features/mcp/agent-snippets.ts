@@ -4,6 +4,8 @@ export interface AgentSnippet {
   readonly title: string;
   readonly caption: string;
   readonly code: string;
+  /** Values an agent's own settings ask for, each copied on its own. */
+  readonly fields?: ReadonlyArray<{ readonly label: string; readonly value: string }>;
 }
 
 const SERVER_NAME = "t3-gateway";
@@ -20,7 +22,37 @@ export const agentSnippets = (
   token: string | null,
 ): ReadonlyArray<AgentSnippet> => {
   const header = token === null ? null : `Bearer ${token}`;
+  const origin = new URL(mcpUrl, "http://gateway.invalid").origin;
+  const genericFields = [
+    { label: "URL", value: mcpUrl },
+    { label: "Transport", value: "Streamable HTTP" },
+    ...(header === null
+      ? [
+          {
+            label: "Protected resource metadata",
+            value: `${origin}/.well-known/oauth-protected-resource/mcp`,
+          },
+          {
+            label: "Authorization server metadata",
+            value: `${origin}/.well-known/oauth-authorization-server`,
+          },
+        ]
+      : [{ label: "Authorization header", value: header }]),
+  ];
   return [
+    {
+      agentId: "generic",
+      title: "Generic",
+      caption:
+        header === null
+          ? "Any MCP client with OAuth: give it the URL. It finds the authorization server from the 401, registers itself (RFC 7591) and signs in with PKCE; you approve it in the browser."
+          : "Any MCP client that can send a header: give it the URL and the `Authorization` header.",
+      fields: genericFields,
+      code: json({
+        url: mcpUrl,
+        ...(header === null ? {} : { headers: { Authorization: header } }),
+      }),
+    },
     {
       agentId: "claude-code",
       title: "Claude Code",

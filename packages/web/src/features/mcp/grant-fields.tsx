@@ -1,9 +1,13 @@
 import type { EnvironmentRecord, McpAccess } from "@t3code-gateway/contracts/schemas";
 
 import { Label } from "../../components/ui/label.tsx";
+import { Radio, RadioGroup } from "../../components/ui/radio-group.tsx";
 import { Switch } from "../../components/ui/switch.tsx";
 import { cn } from "../../lib/utils.ts";
 import { MCP_ACCESS_OPTIONS } from "./mcp-access.ts";
+
+const rowClassName =
+  "flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40";
 
 /** Access level and environments of a relay grant; `environmentIds === null` means all of them. */
 export function GrantFields({
@@ -21,6 +25,7 @@ export function GrantFields({
   environments: ReadonlyArray<EnvironmentRecord>;
   disabled: boolean;
 }>) {
+  const allEnvironments = environmentIds === null;
   const toggleEnvironment = (environmentId: string, checked: boolean) => {
     const current = environmentIds ?? [];
     onEnvironmentIdsChange(
@@ -32,26 +37,26 @@ export function GrantFields({
     <>
       <section className="space-y-3">
         <Label>Access</Label>
-        <div
-          className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25"
-          role="radiogroup"
+        <RadioGroup
+          className="gap-0 divide-y divide-border/60 rounded-lg border border-input bg-muted/25"
+          value={access}
+          disabled={disabled}
+          onValueChange={(value) => {
+            const option = MCP_ACCESS_OPTIONS.find((candidate) => candidate.access === value);
+            if (option !== undefined) {
+              onAccessChange(option.access);
+            }
+          }}
         >
           {MCP_ACCESS_OPTIONS.map((option) => (
             <label
               className={cn(
-                "flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40",
+                "flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40",
                 option.access === access && "bg-muted/40",
               )}
               key={option.access}
             >
-              <input
-                className="mt-0.5 accent-primary"
-                type="radio"
-                name="mcp-access"
-                checked={option.access === access}
-                disabled={disabled}
-                onChange={() => onAccessChange(option.access)}
-              />
+              <Radio value={option.access} />
               <span className="min-w-0">
                 <span className="block text-xs font-medium text-foreground">{option.title}</span>
                 <span className="block text-xs leading-snug text-muted-foreground">
@@ -60,12 +65,12 @@ export function GrantFields({
               </span>
             </label>
           ))}
-        </div>
+        </RadioGroup>
       </section>
       <section className="space-y-3">
         <Label>Environments</Label>
         <div className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
-          <label className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40">
+          <label className={rowClassName}>
             <span className="min-w-0">
               <span className="block text-xs font-medium text-foreground">All environments</span>
               <span className="block text-xs leading-snug text-muted-foreground">
@@ -73,37 +78,35 @@ export function GrantFields({
               </span>
             </span>
             <Switch
-              className="mt-0.5"
-              checked={environmentIds === null}
+              checked={allEnvironments}
               disabled={disabled}
-              onCheckedChange={(checked) => onEnvironmentIdsChange(checked ? null : [])}
+              onCheckedChange={(checked) =>
+                onEnvironmentIdsChange(
+                  checked ? null : environments.map((environment) => environment.environmentId),
+                )
+              }
             />
           </label>
-          {environmentIds === null
-            ? null
-            : environments.map((environment) => (
-                <label
-                  className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
-                  key={environment.environmentId}
-                >
-                  <span className="min-w-0">
-                    <span className="block text-xs font-medium text-foreground">
-                      {environment.label}
-                    </span>
-                    <span className="block font-mono text-xs leading-snug text-muted-foreground">
-                      {environment.slug}
-                    </span>
-                  </span>
-                  <Switch
-                    className="mt-0.5"
-                    checked={environmentIds.includes(environment.environmentId)}
-                    disabled={disabled}
-                    onCheckedChange={(checked) =>
-                      toggleEnvironment(environment.environmentId, checked)
-                    }
-                  />
-                </label>
-              ))}
+          {environments.map((environment) => (
+            <label
+              className={cn(rowClassName, allEnvironments && "pointer-events-none opacity-48")}
+              key={environment.environmentId}
+            >
+              <span className="min-w-0">
+                <span className="block text-xs font-medium text-foreground">
+                  {environment.label}
+                </span>
+                <span className="block font-mono text-xs leading-snug text-muted-foreground">
+                  {environment.slug}
+                </span>
+              </span>
+              <Switch
+                checked={allEnvironments || environmentIds.includes(environment.environmentId)}
+                disabled={disabled || allEnvironments}
+                onCheckedChange={(checked) => toggleEnvironment(environment.environmentId, checked)}
+              />
+            </label>
+          ))}
         </div>
         {environmentIds !== null && environmentIds.length === 0 ? (
           <p className="text-xs text-destructive-foreground">Select at least one environment.</p>
