@@ -4,6 +4,7 @@ import { PlusIcon } from "lucide-react";
 import { useEffect } from "react";
 
 import { AdminShell } from "../../components/admin-shell.tsx";
+import { TableToolbar } from "../../components/table-toolbar.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
   getCurrentUser,
@@ -93,15 +94,13 @@ export function EnvironmentPage() {
   }
 
   return (
-    <AdminShell
-      t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}
-      actions={
+    <AdminShell t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}>
+      <TableToolbar title="Environments">
         <Button size="xs" type="button" onClick={() => openAddDialog(true)}>
           <PlusIcon data-icon="inline-start" />
           Add environment
         </Button>
-      }
-    >
+      </TableToolbar>
       {environmentsQuery.error ? (
         <p className="text-xs text-destructive-foreground">
           {environmentsQuery.error instanceof Error

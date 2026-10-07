@@ -1,17 +1,19 @@
+import type { CreatedMcpToken } from "@t3code-gateway/contracts/schemas";
+import { KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
 
+import { CopyButton } from "../../components/copy-button.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
   Dialog,
-  DialogDescription,
   DialogHeader,
   DialogPanel,
   DialogPopup,
   DialogTitle,
 } from "../../components/ui/dialog.tsx";
-import { Label } from "../../components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group.tsx";
 import { AgentSetup } from "./agent-setup.tsx";
+import { CreateTokenDialog } from "./create-token-dialog.tsx";
 
 type SignIn = "oauth" | "token";
 
@@ -21,27 +23,28 @@ export function ConnectAgentDialog({
   open,
   onOpenChange,
   mcpUrl,
-  onCreateToken,
-}: Readonly<{
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  mcpUrl: string;
-  onCreateToken: () => void;
-}>) {
+}: Readonly<{ open: boolean; onOpenChange: (open: boolean) => void; mcpUrl: string }>) {
   const [signIn, setSignIn] = useState<SignIn>("oauth");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [created, setCreated] = useState<CreatedMcpToken | null>(null);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      onOpenChangeComplete={(nextOpen) => {
+        if (!nextOpen) {
+          setSignIn("oauth");
+          setCreated(null);
+        }
+      }}
+    >
       <DialogPopup className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Connect an agent</DialogTitle>
-          <DialogDescription>
-            One MCP server for every environment this gateway manages.
-          </DialogDescription>
         </DialogHeader>
-        <DialogPanel className="space-y-5">
-          <section className="space-y-3">
-            <Label>Sign-in</Label>
+        <DialogPanel className="space-y-4">
+          <div className="flex items-center gap-3">
             <ToggleGroup
               type="single"
               variant="outline"
@@ -57,26 +60,42 @@ export function ConnectAgentDialog({
               <ToggleGroupItem value="oauth">OAuth</ToggleGroupItem>
               <ToggleGroupItem value="token">Token</ToggleGroupItem>
             </ToggleGroup>
-            {signIn === "oauth" ? (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                The agent signs in through the gateway. You approve it in the browser and choose its
-                access and environments there.
-              </p>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  For agents that only send a header. Replace{" "}
-                  <code className="font-mono text-foreground">{TOKEN_PLACEHOLDER}</code> with a
-                  token; creating one shows this setup with it filled in.
-                </p>
-                <Button size="xs" type="button" variant="outline" onClick={onCreateToken}>
+            {signIn === "token" ? (
+              created === null ? (
+                <Button
+                  className="ml-auto"
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <KeyRoundIcon data-icon="inline-start" />
                   Create token
                 </Button>
-              </div>
-            )}
-          </section>
-          <AgentSetup mcpUrl={mcpUrl} token={signIn === "oauth" ? null : TOKEN_PLACEHOLDER} />
+              ) : (
+                <div className="ml-auto flex min-w-0 items-center gap-1 rounded-lg border border-input bg-muted/25 py-0.5 pr-0.5 pl-2.5">
+                  <code className="min-w-0 truncate font-mono text-xs">{created.token}</code>
+                  <CopyButton className="shrink-0" label="Copy token" value={created.token} />
+                </div>
+              )
+            ) : null}
+          </div>
+          {signIn === "token" && created !== null ? (
+            <p className="text-xs text-muted-foreground">
+              Copy it now: the gateway cannot show {created.grant.label}'s token again.
+            </p>
+          ) : null}
+          <AgentSetup
+            mcpUrl={mcpUrl}
+            token={signIn === "oauth" ? null : (created?.token ?? TOKEN_PLACEHOLDER)}
+          />
         </DialogPanel>
+        <CreateTokenDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          mcpUrl={mcpUrl}
+          onCreated={setCreated}
+        />
       </DialogPopup>
     </Dialog>
   );

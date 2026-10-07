@@ -36,7 +36,14 @@ export function CreateTokenDialog({
   open,
   onOpenChange,
   mcpUrl,
-}: Readonly<{ open: boolean; onOpenChange: (open: boolean) => void; mcpUrl: string }>) {
+  onCreated,
+}: Readonly<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mcpUrl: string;
+  /** Hands the new token to the caller instead of showing it here. */
+  onCreated?: (created: CreatedMcpToken) => void;
+}>) {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
   const [access, setAccess] = useState<McpAccess>(DEFAULT_MCP_ACCESS);
@@ -54,7 +61,12 @@ export function CreateTokenDialog({
   const createMutation = useMutation({
     mutationFn: createMcpToken,
     onSuccess: async (result) => {
-      setCreated(result);
+      if (onCreated === undefined) {
+        setCreated(result);
+      } else {
+        onCreated(result);
+        onOpenChange(false);
+      }
       await queryClient.invalidateQueries({ queryKey: MCP_GRANTS_QUERY_KEY });
     },
   });
@@ -81,7 +93,7 @@ export function CreateTokenDialog({
         }
       }}
     >
-      <DialogPopup className="max-w-xl">
+      <DialogPopup className={created === null ? "max-w-xl" : "max-w-2xl"}>
         <DialogHeader>
           <DialogTitle>{created === null ? "Create token" : "Token created"}</DialogTitle>
           {created === null ? (

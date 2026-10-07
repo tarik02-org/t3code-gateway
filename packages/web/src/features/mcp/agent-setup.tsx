@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { CopyButton } from "../../components/copy-button.tsx";
-import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group.tsx";
+import { cn } from "../../lib/utils.ts";
 import { agentSnippets } from "./agent-snippets.ts";
 
 /** Renders `code` spans in a caption written with backticks. */
@@ -30,41 +30,38 @@ function Caption({ text }: Readonly<{ text: string }>) {
   );
 }
 
-/** Per-agent setup for the gateway URL; with a token, agents send it instead of signing in. */
+/** Per-agent setup: agents on the left, the selected agent's setup on the right. */
 export function AgentSetup({ mcpUrl, token }: Readonly<{ mcpUrl: string; token: string | null }>) {
   const snippets = agentSnippets(mcpUrl, token);
-  const [agentId, setAgentId] = useState(snippets[0]?.agentId ?? "");
+  const [agentId, setAgentId] = useState("generic");
   const snippet = snippets.find((candidate) => candidate.agentId === agentId) ?? snippets[0];
 
   return (
-    <div className="space-y-3">
-      <ToggleGroup
-        className="flex-wrap"
-        type="single"
-        variant="outline"
-        size="sm"
-        value={snippet?.agentId ?? ""}
-        onValueChange={(value) => {
-          if (value !== "") {
-            setAgentId(value);
-          }
-        }}
-        aria-label="Agent"
-      >
+    <div className="flex min-h-64 gap-4">
+      <nav className="flex w-32 shrink-0 flex-col gap-0.5" aria-label="Agent">
         {snippets.map((candidate) => (
-          <ToggleGroupItem key={candidate.agentId} value={candidate.agentId}>
+          <button
+            aria-current={candidate.agentId === snippet?.agentId ? "page" : undefined}
+            className={cn(
+              "rounded-md px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground",
+              candidate.agentId === snippet?.agentId && "bg-muted/60 font-medium text-foreground",
+            )}
+            key={candidate.agentId}
+            type="button"
+            onClick={() => setAgentId(candidate.agentId)}
+          >
             {candidate.title}
-          </ToggleGroupItem>
+          </button>
         ))}
-      </ToggleGroup>
+      </nav>
       {snippet === undefined ? null : (
-        <div className="space-y-2">
+        <div className="min-w-0 flex-1 space-y-2.5">
           <Caption text={snippet.caption} />
           {snippet.fields === undefined ? null : (
             <dl className="divide-y divide-border/60 rounded-lg border border-input bg-muted/25">
               {snippet.fields.map((field) => (
-                <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-3" key={field.label}>
-                  <dt className="w-44 shrink-0 text-xs text-muted-foreground">{field.label}</dt>
+                <div className="flex items-center gap-3 py-1 pr-1 pl-3" key={field.label}>
+                  <dt className="w-24 shrink-0 text-xs text-muted-foreground">{field.label}</dt>
                   <dd className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
                     {field.value}
                   </dd>
@@ -77,16 +74,18 @@ export function AgentSetup({ mcpUrl, token }: Readonly<{ mcpUrl: string; token: 
               ))}
             </dl>
           )}
-          <div className="flex items-start gap-1 rounded-lg border border-input bg-muted/25 pr-1.5">
-            <pre className="min-w-0 flex-1 overflow-x-auto p-3 font-mono text-xs leading-relaxed text-foreground">
-              {snippet.code}
-            </pre>
-            <CopyButton
-              className="mt-1.5 shrink-0"
-              label={`Copy ${snippet.title} setup`}
-              value={snippet.code}
-            />
-          </div>
+          {snippet.code === undefined ? null : (
+            <div className="flex items-start gap-1 rounded-lg border border-input bg-muted/25 pr-1">
+              <pre className="min-w-0 flex-1 overflow-x-auto p-3 font-mono text-xs leading-relaxed text-foreground">
+                {snippet.code}
+              </pre>
+              <CopyButton
+                className="mt-1 shrink-0"
+                label={`Copy ${snippet.title} setup`}
+                value={snippet.code}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -6,17 +6,10 @@ import { useEffect, useState } from "react";
 
 import { AdminShell } from "../../components/admin-shell.tsx";
 import { ConfirmDialog } from "../../components/confirm-dialog.tsx";
+import { TableToolbar } from "../../components/table-toolbar.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Skeleton } from "../../components/ui/skeleton.tsx";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/table.tsx";
 import { toastManager } from "../../components/ui/toast.tsx";
 import {
   getCurrentUser,
@@ -120,78 +113,64 @@ export function McpPage() {
   const grants = grantsQuery.data ?? [];
 
   return (
-    <AdminShell
-      t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}
-      actions={
-        <>
-          <Button size="xs" type="button" variant="outline" onClick={() => setCreateOpen(true)}>
-            <KeyRoundIcon data-icon="inline-start" />
-            Create token
-          </Button>
-          <Button size="xs" type="button" onClick={() => setConnectOpen(true)}>
-            <PlugIcon data-icon="inline-start" />
-            Connect agent
-          </Button>
-        </>
-      }
-    >
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">Connections</h2>
-          <p className="text-xs text-muted-foreground">
-            Agents signed in with OAuth and tokens created here. Revoking cuts the agent off at
-            once.
-          </p>
+    <AdminShell t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}>
+      <TableToolbar title="Connections">
+        <Button size="xs" type="button" variant="outline" onClick={() => setCreateOpen(true)}>
+          <KeyRoundIcon data-icon="inline-start" />
+          Create token
+        </Button>
+        <Button size="xs" type="button" onClick={() => setConnectOpen(true)}>
+          <PlugIcon data-icon="inline-start" />
+          Connect agent
+        </Button>
+      </TableToolbar>
+
+      {grants.length === 0 ? (
+        <div className="rounded-2xl border border-border/60 bg-card p-5 text-sm text-muted-foreground">
+          {grantsQuery.isLoading ? "Loading…" : "No agents connected."}
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Sign-in</TableHead>
-              <TableHead>Access</TableHead>
-              <TableHead>Environments</TableHead>
-              <TableHead>Last used</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {grants.length === 0 ? (
-              <TableRow>
-                <TableCell className="text-muted-foreground" colSpan={7}>
-                  {grantsQuery.isLoading ? (
-                    "Loading…"
-                  ) : (
-                    <span className="flex items-center gap-3">
-                      No agent is connected yet.
-                      <Button
-                        size="xs"
-                        type="button"
-                        variant="outline"
-                        onClick={() => setConnectOpen(true)}
-                      >
-                        Connect agent
-                      </Button>
-                    </span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              grants.map((grant) => (
-                <TableRow key={grant.grantId}>
-                  <TableCell className="font-medium">{grant.label}</TableCell>
-                  <TableCell>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card">
+          <table className="w-full min-w-[880px] table-fixed text-left text-xs">
+            <colgroup>
+              <col />
+              <col className="w-24" />
+              <col className="w-36" />
+              <col className="w-[18%]" />
+              <col className="w-44" />
+              <col className="w-44" />
+              <col className="w-24" />
+            </colgroup>
+            <thead className="border-b border-border/60 bg-foreground/[0.025] text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Sign-in</th>
+                <th className="px-4 py-3 font-medium">Access</th>
+                <th className="px-4 py-3 font-medium">Environments</th>
+                <th className="px-4 py-3 font-medium">Last used</th>
+                <th className="px-4 py-3 font-medium">Expires</th>
+                <th className="px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {grants.map((grant) => (
+                <tr
+                  className="border-b border-border/60 transition-colors last:border-b-0 hover:bg-muted/20"
+                  key={grant.grantId}
+                >
+                  <td className="truncate px-4 py-3">{grant.label}</td>
+                  <td className="px-4 py-3">
                     <Badge variant="outline">{grant.kind === "oauth" ? "OAuth" : "Token"}</Badge>
-                  </TableCell>
-                  <TableCell>{mcpAccessTitle(grant.access)}</TableCell>
-                  <TableCell className="font-mono text-xs">
+                  </td>
+                  <td className="truncate px-4 py-3">{mcpAccessTitle(grant.access)}</td>
+                  <td className="truncate px-4 py-3 font-mono">
                     {environmentNames(grant.environmentIds, environments)}
-                  </TableCell>
-                  <TableCell>{formatDate(grant.lastUsedAt)}</TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-4 py-3">{formatDate(grant.lastUsedAt)}</td>
+                  <td className="px-4 py-3">
                     {grant.kind === "oauth" ? "—" : formatDate(grant.expiresAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <Button
                       size="xs"
                       type="button"
@@ -200,23 +179,15 @@ export function McpPage() {
                     >
                       Revoke
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </section>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <ConnectAgentDialog
-        open={connectOpen}
-        onOpenChange={setConnectOpen}
-        mcpUrl={mcpUrl}
-        onCreateToken={() => {
-          setConnectOpen(false);
-          setCreateOpen(true);
-        }}
-      />
+      <ConnectAgentDialog open={connectOpen} onOpenChange={setConnectOpen} mcpUrl={mcpUrl} />
       <CreateTokenDialog open={createOpen} onOpenChange={setCreateOpen} mcpUrl={mcpUrl} />
       <ConfirmDialog
         open={revokeCandidate !== null}

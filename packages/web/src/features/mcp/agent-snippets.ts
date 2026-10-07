@@ -1,9 +1,10 @@
-/** One way to add the gateway to an agent: OAuth when the agent signs in itself, a token otherwise. */
+/** How to add the gateway to one agent: OAuth when the agent signs in itself, a token otherwise. */
 export interface AgentSnippet {
   readonly agentId: string;
   readonly title: string;
+  /** One short line; `code` spans in backticks. */
   readonly caption: string;
-  readonly code: string;
+  readonly code?: string;
   /** Values an agent's own settings ask for, each copied on its own. */
   readonly fields?: ReadonlyArray<{ readonly label: string; readonly value: string }>;
 }
@@ -22,44 +23,25 @@ export const agentSnippets = (
   token: string | null,
 ): ReadonlyArray<AgentSnippet> => {
   const header = token === null ? null : `Bearer ${token}`;
-  const origin = new URL(mcpUrl, "http://gateway.invalid").origin;
-  const genericFields = [
-    { label: "URL", value: mcpUrl },
-    { label: "Transport", value: "Streamable HTTP" },
-    ...(header === null
-      ? [
-          {
-            label: "Protected resource metadata",
-            value: `${origin}/.well-known/oauth-protected-resource/mcp`,
-          },
-          {
-            label: "Authorization server metadata",
-            value: `${origin}/.well-known/oauth-authorization-server`,
-          },
-        ]
-      : [{ label: "Authorization header", value: header }]),
-  ];
+  const headers = header === null ? {} : { headers: { Authorization: header } };
   return [
     {
       agentId: "generic",
       title: "Generic",
       caption:
         header === null
-          ? "Any MCP client with OAuth: give it the URL. It finds the authorization server from the 401, registers itself (RFC 7591) and signs in with PKCE; you approve it in the browser."
-          : "Any MCP client that can send a header: give it the URL and the `Authorization` header.",
-      fields: genericFields,
-      code: json({
-        url: mcpUrl,
-        ...(header === null ? {} : { headers: { Authorization: header } }),
-      }),
+          ? "Any MCP client with OAuth: it registers and signs in on its own."
+          : "Any MCP client that can send a header.",
+      fields: [
+        { label: "URL", value: mcpUrl },
+        { label: "Transport", value: "Streamable HTTP" },
+        ...(header === null ? [] : [{ label: "Authorization", value: header }]),
+      ],
     },
     {
       agentId: "claude-code",
       title: "Claude Code",
-      caption:
-        header === null
-          ? "Run once, then sign in from `/mcp` inside Claude Code."
-          : "Run once in a terminal.",
+      caption: header === null ? "Then sign in with `/mcp` in Claude Code." : "Run in a terminal.",
       code:
         header === null
           ? `claude mcp add --transport http --scope user ${SERVER_NAME} ${mcpUrl}`
@@ -70,55 +52,33 @@ export const agentSnippets = (
       title: "Codex",
       caption:
         header === null
-          ? "Add to `~/.codex/config.toml`, then run `codex mcp login t3-gateway`. The timeout lets `t3_thread_wait` run past the default 60 s."
-          : `Add to \`~/.codex/config.toml\` and export ${TOKEN_ENV} with the token. The timeout lets \`t3_thread_wait\` run past the default 60 s.`,
+          ? "In `~/.codex/config.toml`, then `codex mcp login t3-gateway`."
+          : `In \`~/.codex/config.toml\`, with the token in \`${TOKEN_ENV}\`.`,
       code: [
         `[mcp_servers.${SERVER_NAME}]`,
         `url = "${mcpUrl}"`,
         ...(header === null ? [] : [`bearer_token_env_var = "${TOKEN_ENV}"`]),
+        // `t3_thread_wait` outlasts Codex's default 60 s tool timeout.
         "tool_timeout_sec = 900",
       ].join("\n"),
     },
     {
       agentId: "cursor",
       title: "Cursor",
-      caption:
-        header === null
-          ? "Add to `~/.cursor/mcp.json`; Cursor asks you to sign in."
-          : "Add to `~/.cursor/mcp.json`.",
-      code: json({
-        mcpServers: {
-          [SERVER_NAME]: {
-            url: mcpUrl,
-            ...(header === null ? {} : { headers: { Authorization: header } }),
-          },
-        },
-      }),
+      caption: "In `~/.cursor/mcp.json`.",
+      code: json({ mcpServers: { [SERVER_NAME]: { url: mcpUrl, ...headers } } }),
     },
     {
       agentId: "vscode",
       title: "VS Code",
-      caption:
-        header === null
-          ? "Add to `.vscode/mcp.json` (or the user `mcp.json`); VS Code asks you to sign in."
-          : "Add to `.vscode/mcp.json` (or the user `mcp.json`).",
-      code: json({
-        servers: {
-          [SERVER_NAME]: {
-            type: "http",
-            url: mcpUrl,
-            ...(header === null ? {} : { headers: { Authorization: header } }),
-          },
-        },
-      }),
+      caption: "In `.vscode/mcp.json` or the user `mcp.json`.",
+      code: json({ servers: { [SERVER_NAME]: { type: "http", url: mcpUrl, ...headers } } }),
     },
     {
       agentId: "opencode",
       title: "OpenCode",
       caption:
-        header === null
-          ? "Add to `opencode.json`; OpenCode signs in on first use, or run `opencode mcp auth t3-gateway`."
-          : "Add to `opencode.json`.",
+        header === null ? "In `opencode.json`; it signs in on first use." : "In `opencode.json`.",
       code: json({
         $schema: "https://opencode.ai/config.json",
         mcp: {
@@ -126,7 +86,7 @@ export const agentSnippets = (
             type: "remote",
             url: mcpUrl,
             enabled: true,
-            ...(header === null ? {} : { oauth: false, headers: { Authorization: header } }),
+            ...(header === null ? {} : { oauth: false, ...headers }),
           },
         },
       }),
@@ -136,25 +96,17 @@ export const agentSnippets = (
       title: "Gemini CLI",
       caption:
         header === null
-          ? "Add to `~/.gemini/settings.json`, then run `/mcp auth t3-gateway` in Gemini CLI."
-          : "Add to `~/.gemini/settings.json`.",
-      code: json({
-        mcpServers: {
-          [SERVER_NAME]: {
-            httpUrl: mcpUrl,
-            ...(header === null ? {} : { headers: { Authorization: header } }),
-          },
-        },
-      }),
+          ? "In `~/.gemini/settings.json`, then `/mcp auth t3-gateway`."
+          : "In `~/.gemini/settings.json`.",
+      code: json({ mcpServers: { [SERVER_NAME]: { httpUrl: mcpUrl, ...headers } } }),
     },
     ...(header === null
       ? [
           {
             agentId: "claude-ai",
             title: "Claude app",
-            caption:
-              "Settings → Connectors → Add custom connector, and paste the URL. The gateway must be reachable over https from the internet.",
-            code: mcpUrl,
+            caption: "Settings → Connectors → Add custom connector. Needs a public https URL.",
+            fields: [{ label: "URL", value: mcpUrl }],
           },
         ]
       : []),
