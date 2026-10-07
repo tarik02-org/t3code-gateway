@@ -6,6 +6,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import { AuthService } from "../auth/service.ts";
 import { GatewayRuntimeConfig } from "../config.ts";
 import { readSessionToken } from "./cookies.ts";
+import { MCP_PATH } from "./mcp-routes.ts";
 
 const publicGatewayRoutes = new Set([
   "POST /api/gateway/auth/login",
@@ -37,6 +38,11 @@ const sessionRequiredFor = (
   const path = pathname(request.url);
 
   if (publicGatewayRoutes.has(`${request.method} ${path}`)) {
+    return false;
+  }
+
+  // Relay clients authenticate with their own bearer tokens.
+  if (path === MCP_PATH) {
     return false;
   }
 

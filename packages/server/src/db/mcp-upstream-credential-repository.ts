@@ -48,6 +48,12 @@ export class McpUpstreamCredentialRepository extends Context.Service<
       access: McpAccess,
       input: SaveMcpUpstreamTokenInput,
     ) => Effect.Effect<void, DatabaseError>;
+    /** Forgets a token the environment no longer accepts, unless it was already replaced. */
+    readonly clearToken: (
+      environmentId: string,
+      access: McpAccess,
+      sessionId: string,
+    ) => Effect.Effect<void, DatabaseError>;
     readonly recordFailure: (
       environmentId: string,
       access: McpAccess,
@@ -127,6 +133,25 @@ export const make = Effect.gen(function* () {
       );
   };
 
+  const clearToken = (environmentId: string, access: McpAccess, sessionId: string) =>
+    db
+      .update(mcpUpstreamCredentials)
+      .set({ tokenEncrypted: null, sessionId: null, expiresAt: null })
+      .where(
+        and(
+          eq(mcpUpstreamCredentials.environmentId, environmentId),
+          eq(mcpUpstreamCredentials.access, access),
+          eq(mcpUpstreamCredentials.sessionId, sessionId),
+        ),
+      )
+      .run()
+      .pipe(
+        Effect.asVoid,
+        Effect.catchTags({
+          EffectDrizzleQueryError: (error) => queryError("mcpCredential", error),
+        }),
+      );
+
   // A failure keeps the current token: it stays usable until it expires.
   const recordFailure = (
     environmentId: string,
@@ -159,6 +184,7 @@ export const make = Effect.gen(function* () {
     listEnvironmentCredentials,
     findCredential,
     saveToken,
+    clearToken,
     recordFailure,
   });
 });

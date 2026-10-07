@@ -1,5 +1,5 @@
 import { blob, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { McpAccess } from "@t3code-gateway/contracts/schemas";
+import type { McpAccess, McpGrantKind } from "@t3code-gateway/contracts/schemas";
 
 export const gatewaySettings = sqliteTable("gateway_settings", {
   key: text("key").primaryKey(),
@@ -60,3 +60,33 @@ export const mcpUpstreamCredentials = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.environmentId, table.access] })],
 );
+
+/** What one relay client may do through the gateway's `/mcp`. */
+export const mcpGrants = sqliteTable("mcp_grants", {
+  grantId: text("grant_id").primaryKey(),
+  kind: text("kind").$type<McpGrantKind>().notNull(),
+  label: text("label").notNull(),
+  access: text("access").$type<McpAccess>().notNull(),
+  /** JSON array of environment ids; `null` reaches every environment. */
+  environmentIdsJson: text("environment_ids_json"),
+  /** The OAuth client the grant was approved for; `null` for gateway tokens. */
+  clientId: text("client_id"),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: text("created_at").notNull(),
+  lastUsedAt: text("last_used_at"),
+  expiresAt: text("expires_at"),
+});
+
+/** Bearer credentials for a grant, stored as SHA-256 hashes. */
+export const mcpTokens = sqliteTable("mcp_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  grantId: text("grant_id")
+    .notNull()
+    .references(() => mcpGrants.grantId, { onDelete: "cascade" }),
+  /** Only access tokens open `/mcp`; refresh tokens only reach the OAuth token endpoint. */
+  kind: text("kind").$type<"access" | "refresh">().notNull(),
+  expiresAt: text("expires_at"),
+  createdAt: text("created_at").notNull(),
+});
