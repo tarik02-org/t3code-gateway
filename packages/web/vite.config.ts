@@ -38,7 +38,7 @@ export default defineConfig({
           },
         },
         {
-          path: "/admin/mcp",
+          path: "/admin/connections",
           prerender: {
             crawlLinks: false,
           },
