@@ -84,8 +84,9 @@ export function EnvironmentTable({
               <td className="px-4 py-3">
                 <div className="flex min-w-0 items-center gap-1">
                   <a
-                    className="min-w-0 [overflow-wrap:anywhere] text-primary hover:underline"
+                    className="min-w-0 truncate text-primary hover:underline"
                     href={environment.publicUrl}
+                    title={environment.publicUrl}
                     rel="noreferrer"
                     target="_blank"
                   >
@@ -472,8 +473,8 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
 function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: boolean }>) {
   return (
     <colgroup>
-      <col className="w-[14%]" />
-      <col className="w-[11%]" />
+      <col className="w-[12%]" />
+      <col className="w-[12%]" />
       <col />
       <col className="w-30" />
       <col className="w-26" />
