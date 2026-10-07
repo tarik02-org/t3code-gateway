@@ -6,6 +6,7 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
+import { GatewayRuntimeConfig } from "../config.ts";
 import {
   authorizationServerMetadata,
   McpClientRegistration,
@@ -55,13 +56,13 @@ const errorPage = (description: string) =>
     },
   );
 
-const urlsFor = (request: HttpServerRequest.HttpServerRequest) =>
-  mcpOAuthUrls(requestOrigin(request.headers));
-
 export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const router = yield* HttpRouter.HttpRouter;
     const oauth = yield* McpOAuth;
+    const config = yield* GatewayRuntimeConfig;
+    const urlsFor = (request: HttpServerRequest.HttpServerRequest) =>
+      mcpOAuthUrls(requestOrigin(request.headers, config.publicUrl));
 
     const preflight = HttpServerResponse.empty({ status: 204, headers: CORS_HEADERS });
     const metadata = (build: (urls: ReturnType<typeof mcpOAuthUrls>) => unknown) =>

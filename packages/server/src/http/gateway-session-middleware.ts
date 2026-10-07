@@ -9,6 +9,7 @@ import * as Cookies from "effect/unstable/http/Cookies";
 import * as Headers from "effect/unstable/http/Headers";
 
 import { SESSION_COOKIE_NAME } from "../auth/constants.ts";
+import { configLayer, GatewayRuntimeConfig } from "../config.ts";
 import { requestOrigin } from "./request-origin.ts";
 
 const readSessionToken = (cookies: Readonly<Record<string, string>>) =>
@@ -20,17 +21,26 @@ const isSecureFromHeaders = (headers: Headers.Headers) =>
     Option.getOrElse(() => false),
   );
 
-const requestContextFromHeaders = (headers: Headers.Headers) => {
+const requestContextFromHeaders = (headers: Headers.Headers, publicUrl: Option.Option<URL>) => {
   const cookieHeader = Headers.get(headers, "cookie").pipe(Option.getOrUndefined);
   const cookies = Cookies.parseHeader(cookieHeader ?? "");
 
   return {
     sessionToken: readSessionToken(cookies),
     secure: isSecureFromHeaders(headers),
-    origin: requestOrigin(headers),
+    origin: requestOrigin(headers, publicUrl),
   };
 };
 
-export const layer = Layer.succeed(GatewaySessionMiddleware, (effect, { headers }) =>
-  Effect.provideService(effect, GatewayRequestContext, requestContextFromHeaders(headers)),
-);
+export const layer = Layer.effect(
+  GatewaySessionMiddleware,
+  Effect.map(GatewayRuntimeConfig, (config) =>
+    GatewaySessionMiddleware.of((effect, { headers }) =>
+      Effect.provideService(
+        effect,
+        GatewayRequestContext,
+        requestContextFromHeaders(headers, config.publicUrl),
+      ),
+    ),
+  ),
+).pipe(Layer.provide(configLayer));

@@ -36,6 +36,8 @@ export const GatewayConfig = Config.all({
     Config.withDefault("tarik02-org/t3code"),
   ),
   githubToken: Config.redacted("T3_GATEWAY_GITHUB_TOKEN").pipe(Config.option),
+  /** Pins the origin OAuth and MCP advertise, for proxies that misreport `X-Forwarded-Proto`. */
+  publicUrl: Config.url("T3_GATEWAY_PUBLIC_URL").pipe(Config.option),
 });
 
 export type GatewayConfig = Config.Success<typeof GatewayConfig>;
