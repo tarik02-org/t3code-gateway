@@ -64,8 +64,9 @@ with `T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED=true` and expose ports `80` and `443`.
 
 Agents connect to `https://<gateway host>/mcp` once and reach every environment they are allowed
 to. Every T3 Code tool gets an `environment` argument naming the environment it runs in, and
-`gateway_list_environments` lists them. The `Connections` page in the admin UI shows setup for common
-agents, the connected agents, and the gateway's own sign-in to each environment.
+`gateway_list_environments` lists them. The `Connections` page in the admin UI shows setup for
+common agents and the connected agents; the `MCP` column on `Environments` shows the gateway's own
+sign-in to each environment.
 
 - Agents that support MCP OAuth sign in with just the URL. An admin approves them in the browser
   and picks their access level and environments.
