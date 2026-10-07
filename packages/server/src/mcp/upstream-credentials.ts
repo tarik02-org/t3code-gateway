@@ -27,6 +27,7 @@ import { createMcpClientToken, revokeClientSession } from "../environments/t3cod
 const ROTATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1_000;
 // Relay requests ask for tokens on demand; a failing environment is retried at most this often.
 const FAILURE_BACKOFF = "1 minute";
+const SIGN_IN_TIMEOUT = "30 seconds";
 
 const credentialLabel = (access: McpAccess) => `T3 Code Gateway relay (${access})`;
 
@@ -172,6 +173,11 @@ export const make = Effect.gen(function* () {
     });
 
     return yield* signIn.pipe(
+      // Callers queue behind this credential's lock, so a silent environment must not hold it.
+      Effect.timeoutOrElse({
+        duration: SIGN_IN_TIMEOUT,
+        orElse: () => Effect.fail(new EnvironmentFailure({ message: "MCP sign-in timed out" })),
+      }),
       Effect.catchTag("EnvironmentFailure", (error) =>
         Effect.gen(function* () {
           yield* credentialRepository.recordFailure(environmentId, access, {

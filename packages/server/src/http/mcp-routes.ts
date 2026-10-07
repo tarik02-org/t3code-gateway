@@ -31,6 +31,11 @@ export const layer = Layer.effectDiscard(
 
     const handler = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
+      // Stateless: no session to stream server messages on or to end. An SSE stream that closes
+      // at once would only make SDK clients reconnect every second.
+      if (request.method !== "POST") {
+        return HttpServerResponse.empty({ status: 405, headers: { allow: "POST" } });
+      }
       const origin = requestOrigin(request.headers, config.publicUrl);
 
       // Agents call from processes, not pages: a page on another origin must not drive the relay.
