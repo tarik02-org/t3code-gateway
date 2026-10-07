@@ -61,7 +61,6 @@ const browserTokenScopes = [
   "orchestration:read",
   "orchestration:operate",
   "terminal:operate",
-  "review:write",
   "relay:read",
 ];
 
@@ -96,7 +95,6 @@ const clientScopes = [
   "orchestration:read",
   "orchestration:operate",
   "terminal:operate",
-  "review:write",
   "access:read",
   "access:write",
   "relay:read",

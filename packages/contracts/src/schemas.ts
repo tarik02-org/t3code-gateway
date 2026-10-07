@@ -181,7 +181,6 @@ export const DEFAULT_BROWSER_TOKEN_SCOPES = [
   "orchestration:read",
   "orchestration:operate",
   "terminal:operate",
-  "review:write",
   "relay:read",
 ] as const;
 
