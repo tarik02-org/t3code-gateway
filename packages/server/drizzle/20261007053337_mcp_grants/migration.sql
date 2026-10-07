@@ -4,6 +4,7 @@ CREATE TABLE `mcp_grants` (
 	`label` text NOT NULL,
 	`access` text NOT NULL,
 	`environment_ids_json` text,
+	`client_id` text,
 	`created_by_user_id` text,
 	`created_at` text NOT NULL,
 	`last_used_at` text,
@@ -14,6 +15,7 @@ CREATE TABLE `mcp_grants` (
 CREATE TABLE `mcp_tokens` (
 	`token_hash` text PRIMARY KEY,
 	`grant_id` text NOT NULL,
+	`kind` text NOT NULL,
 	`expires_at` text,
 	`created_at` text NOT NULL,
 	CONSTRAINT `fk_mcp_tokens_grant_id_mcp_grants_grant_id_fk` FOREIGN KEY (`grant_id`) REFERENCES `mcp_grants`(`grant_id`) ON DELETE CASCADE

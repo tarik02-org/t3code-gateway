@@ -69,6 +69,8 @@ export const mcpGrants = sqliteTable("mcp_grants", {
   access: text("access").$type<McpAccess>().notNull(),
   /** JSON array of environment ids; `null` reaches every environment. */
   environmentIdsJson: text("environment_ids_json"),
+  /** The OAuth client the grant was approved for; `null` for gateway tokens. */
+  clientId: text("client_id"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -83,6 +85,8 @@ export const mcpTokens = sqliteTable("mcp_tokens", {
   grantId: text("grant_id")
     .notNull()
     .references(() => mcpGrants.grantId, { onDelete: "cascade" }),
+  /** Only access tokens open `/mcp`; refresh tokens only reach the OAuth token endpoint. */
+  kind: text("kind").$type<"access" | "refresh">().notNull(),
   expiresAt: text("expires_at"),
   createdAt: text("created_at").notNull(),
 });

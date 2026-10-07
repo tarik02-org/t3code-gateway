@@ -25,7 +25,7 @@ export class McpGrantRepository extends Context.Service<
     readonly addToken: (token: CreateMcpTokenInput) => Effect.Effect<void, DatabaseError>;
     readonly deleteToken: (tokenHash: string) => Effect.Effect<void, DatabaseError>;
     readonly deleteGrant: (grantId: string) => Effect.Effect<boolean, DatabaseError>;
-    /** The grant a token hash belongs to, when neither has expired. */
+    /** The grant an access token hash belongs to, when neither has expired. */
     readonly findGrantByTokenHash: (
       tokenHash: string,
       now: string,
@@ -90,6 +90,7 @@ export const make = Effect.gen(function* () {
         .where(
           and(
             eq(mcpTokens.tokenHash, tokenHash),
+            eq(mcpTokens.kind, "access"),
             notExpired(mcpTokens.expiresAt, now),
             notExpired(mcpGrants.expiresAt, now),
           ),

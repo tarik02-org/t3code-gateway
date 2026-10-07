@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "e8d985b1-0308-43fa-a513-94a67b2fd5b9",
+  "id": "0742b038-c5e7-4c52-b056-bdeb0c03a23e",
   "prevIds": ["66b8f831-6d83-4b4b-b972-de73403efc38"],
   "ddl": [
     {
@@ -248,6 +248,16 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
+      "name": "client_id",
+      "entityType": "columns",
+      "table": "mcp_grants"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
       "name": "created_by_user_id",
       "entityType": "columns",
       "table": "mcp_grants"
@@ -299,6 +309,16 @@
       "default": null,
       "generated": null,
       "name": "grant_id",
+      "entityType": "columns",
+      "table": "mcp_tokens"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
       "entityType": "columns",
       "table": "mcp_tokens"
     },

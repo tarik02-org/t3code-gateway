@@ -147,6 +147,7 @@ export const make = Effect.gen(function* () {
         label: grant.label,
         access: input.access,
         environmentIdsJson: grant.environmentIdsJson,
+        clientId: null,
         createdByUserId,
         createdAt,
         lastUsedAt: null,
@@ -155,6 +156,7 @@ export const make = Effect.gen(function* () {
       yield* grants.createGrant(row, {
         tokenHash,
         grantId: row.grantId,
+        kind: "access",
         expiresAt,
         createdAt,
       });
