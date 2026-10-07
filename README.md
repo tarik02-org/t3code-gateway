@@ -76,7 +76,9 @@ level in use and relays every call with the matching credential. Environments ne
 with MCP OAuth for outside agents (pingdotgg/t3code#16336).
 
 OAuth URLs come from the request, so the proxy in front of the gateway must pass `Host` (or
-`X-Forwarded-Host`) and `X-Forwarded-Proto`.
+`X-Forwarded-Host`) and `X-Forwarded-Proto`. Behind a proxy that reports the wrong scheme (for
+example a TLS-terminating CDN in front of a plain-HTTP hop), set `T3_GATEWAY_PUBLIC_URL` to the
+gateway's public origin.
 
 ## Development
 
