@@ -20,9 +20,11 @@ import {
   createT3CodeCatalogEntry,
   deleteEnvironment,
   updateEnvironment,
+  signOutMcpUpstream,
 } from "../../lib/gateway-api.ts";
 import { cn } from "../../lib/utils.ts";
 import { mcpAccessTitle } from "../mcp/mcp-access.ts";
+import { MCP_UPSTREAM_QUERY_KEY } from "../mcp/query-keys.ts";
 import { ENVIRONMENTS_QUERY_KEY } from "./query-keys.ts";
 import { useT3CodeCatalogPopoverStore } from "./t3code-catalog-popover-store.ts";
 import { useT3CodeCatalogStore } from "./t3code-catalog-store.ts";
@@ -55,7 +57,7 @@ export function EnvironmentTable({
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
+          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -101,6 +103,7 @@ export function EnvironmentTable({
               </td>
               <td className="px-2 py-3 text-center">
                 <McpStatusBadge
+                  environment={environment}
                   credentials={mcpCredentials.filter(
                     (credential) => credential.environmentId === environment.environmentId,
                   )}
@@ -144,52 +147,86 @@ const formatDate = (value: string) =>
 
 /** The gateway's own MCP sign-ins to an environment, one per access level agents use. */
 function McpStatusBadge({
+  environment,
   credentials,
 }: Readonly<{
+  environment: EnvironmentRecord;
   credentials: ReadonlyArray<McpUpstreamCredentialStatus>;
 }>) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const signOutMutation = useMutation({
+    mutationFn: () => signOutMcpUpstream(environment.environmentId),
+    onSuccess: async () => {
+      setOpen(false);
+      toastManager.add({ type: "success", title: `Signed out of ${environment.label}` });
+      await queryClient.invalidateQueries({ queryKey: MCP_UPSTREAM_QUERY_KEY });
+    },
+    onError: (cause) => {
+      toastManager.add({
+        type: "error",
+        title: "Could not sign out",
+        description: errorMessage(cause, "The environment did not revoke the sign-in."),
+      });
+    },
+  });
+
   const failing = credentials.filter((credential) => credential.lastFailure !== null);
   const signedOut = failing.some((credential) => credential.expiresAt === null);
-  const label =
+  const [label, variant] =
     credentials.length === 0
-      ? "Unused"
+      ? (["Unused", "ghost"] as const)
       : failing.length === 0
-        ? "Signed in"
+        ? (["Signed in", "secondary"] as const)
         : signedOut
-          ? "Failing"
-          : "Retrying";
-  const variant =
-    credentials.length === 0
-      ? "ghost"
-      : failing.length === 0
-        ? "secondary"
-        : signedOut
-          ? "destructive"
-          : "outline";
-  const details =
-    credentials.length === 0 ? (
-      <p>The gateway signs in the first time an agent uses this environment over MCP.</p>
-    ) : (
-      <div className="flex flex-col gap-1">
-        {credentials.map((credential) => (
-          <p key={credential.access}>
-            {mcpAccessTitle(credential.access)}:{" "}
-            {credential.lastFailure ??
-              (credential.expiresAt === null
-                ? "not signed in"
-                : `renews before ${formatDate(credential.expiresAt)}`)}
-          </p>
-        ))}
-      </div>
-    );
+          ? (["Failing", "destructive"] as const)
+          : (["Retrying", "outline"] as const);
 
   return (
-    <Tooltip>
-      <TooltipTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
         {label}
-      </TooltipTrigger>
-      <TooltipContent>{details}</TooltipContent>
-    </Tooltip>
+      </PopoverTrigger>
+      <PopoverPopup className="w-72" side="bottom">
+        {credentials.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            The gateway signs in the first time an agent uses this environment over MCP.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-1.5 text-xs">
+              {credentials.map((credential) => (
+                <li className="flex flex-col" key={credential.access}>
+                  <span className="font-medium">{mcpAccessTitle(credential.access)}</span>
+                  <span
+                    className={
+                      credential.lastFailure === null
+                        ? "text-muted-foreground"
+                        : "text-destructive-foreground"
+                    }
+                  >
+                    {credential.lastFailure ??
+                      (credential.expiresAt === null
+                        ? "Not signed in"
+                        : `Renews before ${formatDate(credential.expiresAt)}`)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Button
+              className="self-end"
+              size="xs"
+              type="button"
+              variant="outline"
+              disabled={signOutMutation.isPending}
+              onClick={() => signOutMutation.mutate()}
+            >
+              {signOutMutation.isPending ? "Signing out..." : "Sign out"}
+            </Button>
+          </div>
+        )}
+      </PopoverPopup>
+    </Popover>
   );
 }
 
@@ -374,7 +411,7 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
       <table
         className={cn(
           "w-full table-fixed text-left text-xs",
-          showWebColumn ? "min-w-[1280px]" : "min-w-[1216px]",
+          showWebColumn ? "min-w-[1040px]" : "min-w-[976px]",
         )}
       >
         <EnvironmentTableColumns showWebColumn={showWebColumn} />
@@ -435,14 +472,14 @@ export function EnvironmentTableSkeleton({ showWebColumn }: Readonly<{ showWebCo
 function EnvironmentTableColumns({ showWebColumn }: Readonly<{ showWebColumn: boolean }>) {
   return (
     <colgroup>
-      <col className="w-[16%]" />
-      <col className="w-[13%]" />
+      <col className="w-[14%]" />
+      <col className="w-[11%]" />
       <col />
-      <col className="w-32" />
-      <col className="w-28" />
+      <col className="w-30" />
+      <col className="w-26" />
       <col className="w-18" />
       {showWebColumn ? <col className="w-16" /> : null}
-      <col className="w-64" />
+      <col className="w-[17.5rem]" />
     </colgroup>
   );
 }

@@ -103,7 +103,7 @@ export function AdminShell({
         ) : null}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-7 sm:px-8 sm:py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-6">
           {children}
         </div>
       </div>

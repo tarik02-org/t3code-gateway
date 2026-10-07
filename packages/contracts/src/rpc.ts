@@ -232,6 +232,11 @@ export class ListMcpUpstreamCredentials extends Rpc.make("gateway.mcp.upstream.l
   error: McpFailure,
 }).middleware(GatewaySessionMiddleware) {}
 
+export class SignOutMcpUpstream extends Rpc.make("gateway.mcp.upstream.signOut", {
+  payload: EnvironmentIdPayload,
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
 export class DescribeMcpAuthorization extends Rpc.make("gateway.mcp.oauth.describe", {
   payload: McpAuthorizationRequest,
   success: McpAuthorizationDetails,
@@ -271,6 +276,7 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateMcpToken,
   RevokeMcpGrant,
   ListMcpUpstreamCredentials,
+  SignOutMcpUpstream,
   DescribeMcpAuthorization,
   DecideMcpAuthorization,
   UpdateT3CodeWebSettings,

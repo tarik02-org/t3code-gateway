@@ -53,6 +53,14 @@ export class McpUpstreamCredentials extends Context.Service<
     readonly listStatus: Effect.Effect<ReadonlyArray<McpUpstreamCredentialStatus>, DatabaseError>;
     /** Rotates every stored credential that is due. */
     readonly sweep: Effect.Effect<void>;
+    /**
+     * Revokes the gateway's MCP sessions on an environment and forgets them; the
+     * next relay call signs in again. Fails, keeping the credential, when the
+     * environment cannot revoke it.
+     */
+    readonly signOut: (
+      environmentId: string,
+    ) => Effect.Effect<void, EnvironmentFailure | DatabaseError>;
     /** Signs the gateway's MCP sessions out of an environment before it is removed. */
     readonly revokeEnvironment: (environmentId: string) => Effect.Effect<void>;
   }
@@ -260,6 +268,43 @@ export const make = Effect.gen(function* () {
     ),
   );
 
+  const signOut = (environmentId: string) =>
+    Effect.gen(function* () {
+      const environment = yield* environmentRepository.findEnvironment(environmentId);
+      if (environment === undefined) {
+        return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
+      }
+      const credentials = yield* credentialRepository.listEnvironmentCredentials(environmentId);
+      yield* Effect.forEach(
+        credentials,
+        (row) =>
+          lockFor(environmentId, row.access).withPermit(
+            Effect.gen(function* () {
+              if (row.sessionId !== null) {
+                const adminToken = yield* adminTokens.ensureFresh(environmentId);
+                yield* revokeClientSession(
+                  client,
+                  environment.endpoint,
+                  adminToken,
+                  row.sessionId,
+                ).pipe(
+                  // Already gone upstream: nothing left to sign out.
+                  Effect.catchIf(
+                    (error) => error.status === 404,
+                    () => Effect.void,
+                  ),
+                );
+              }
+              yield* credentialRepository.deleteCredential(environmentId, row.access);
+            }),
+          ),
+        { discard: true },
+      );
+      yield* Effect.logInfo("Signed MCP relay out of environment").pipe(
+        Effect.annotateLogs({ environmentId }),
+      );
+    });
+
   const revokeEnvironment = (environmentId: string) =>
     Effect.gen(function* () {
       const environment = yield* environmentRepository.findEnvironment(environmentId);
@@ -285,6 +330,7 @@ export const make = Effect.gen(function* () {
     invalidate,
     listStatus,
     sweep,
+    signOut,
     revokeEnvironment,
   });
 });

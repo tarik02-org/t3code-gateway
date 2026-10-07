@@ -221,6 +221,10 @@ export async function listMcpUpstreamCredentials(): Promise<
   return runGatewayRpc((client) => client["gateway.mcp.upstream.list"](undefined));
 }
 
+export async function signOutMcpUpstream(environmentId: string): Promise<void> {
+  await runGatewayRpc((client) => client["gateway.mcp.upstream.signOut"]({ environmentId }));
+}
+
 export async function describeMcpAuthorization(
   payload: McpAuthorizationRequest,
 ): Promise<McpAuthorizationDetails> {

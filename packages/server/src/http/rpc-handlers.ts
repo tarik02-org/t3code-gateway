@@ -250,6 +250,14 @@ export const layer = GatewayRpcs.toLayer(
           return { redirectTo };
         }).pipe(Effect.catchTags(mcpRpcErrors)),
 
+      "gateway.mcp.upstream.signOut": (payload: EnvironmentIdPayload) =>
+        mcpCredentials.signOut(payload.environmentId).pipe(
+          Effect.catchTags({
+            EnvironmentFailure: (error) => Effect.fail(new McpFailure({ message: error.message })),
+            ...mcpRpcDatabaseErrors,
+          }),
+        ),
+
       "gateway.mcp.upstream.list": () =>
         mcpCredentials.listStatus.pipe(Effect.catchTags(mcpRpcDatabaseErrors)),
     });
