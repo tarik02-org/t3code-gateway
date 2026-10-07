@@ -1,5 +1,13 @@
 # @t3code-gateway/screenshots
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [a935b94]
+- Updated dependencies [81d7762]
+  - @t3code-gateway/contracts@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

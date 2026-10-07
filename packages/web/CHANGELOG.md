@@ -1,5 +1,23 @@
 # @t3code-gateway/web
 
+## 0.5.0
+
+### Minor Changes
+
+- a935b94: Add a Sessions page listing every environment's authorized clients in one table, with search, last
+  connection, expiry and revoke. The gateway's own sessions (its admin token and its MCP sign-ins) are
+  marked, hidden by default and cannot be revoked from the page.
+- 81d7762: Turn MCP on or off per environment. The `MCP` column is now a switch, also in the edit dialog, on by
+  default. Turning it off removes the environment from the relay and signs the gateway out of it;
+  turning it on needs nothing, the gateway signs in when an agent first uses it. A failing sign-in
+  shows as a red dot next to the switch.
+
+### Patch Changes
+
+- Updated dependencies [a935b94]
+- Updated dependencies [81d7762]
+  - @t3code-gateway/contracts@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
