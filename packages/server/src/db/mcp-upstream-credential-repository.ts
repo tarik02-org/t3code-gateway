@@ -54,6 +54,10 @@ export class McpUpstreamCredentialRepository extends Context.Service<
       access: McpAccess,
       sessionId: string,
     ) => Effect.Effect<void, DatabaseError>;
+    readonly deleteCredential: (
+      environmentId: string,
+      access: McpAccess,
+    ) => Effect.Effect<void, DatabaseError>;
     readonly recordFailure: (
       environmentId: string,
       access: McpAccess,
@@ -152,6 +156,23 @@ export const make = Effect.gen(function* () {
         }),
       );
 
+  const deleteCredential = (environmentId: string, access: McpAccess) =>
+    db
+      .delete(mcpUpstreamCredentials)
+      .where(
+        and(
+          eq(mcpUpstreamCredentials.environmentId, environmentId),
+          eq(mcpUpstreamCredentials.access, access),
+        ),
+      )
+      .run()
+      .pipe(
+        Effect.asVoid,
+        Effect.catchTags({
+          EffectDrizzleQueryError: (error) => queryError("mcpCredential", error),
+        }),
+      );
+
   // A failure keeps the current token: it stays usable until it expires.
   const recordFailure = (
     environmentId: string,
@@ -185,6 +206,7 @@ export const make = Effect.gen(function* () {
     findCredential,
     saveToken,
     clearToken,
+    deleteCredential,
     recordFailure,
   });
 });

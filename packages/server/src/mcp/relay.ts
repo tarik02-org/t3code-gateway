@@ -1,4 +1,4 @@
-import type { McpAccess } from "@t3code-gateway/contracts/schemas";
+import { McpAccess } from "@t3code-gateway/contracts/schemas";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   StreamableHTTPClientTransport,
@@ -31,6 +31,7 @@ import type { McpCaller } from "./grants.ts";
 import { McpUpstreamCredentials } from "./upstream-credentials.ts";
 
 const ENVIRONMENT_ARGUMENT = "environment";
+const MCP_ACCESS_LEVELS = McpAccess.literals;
 const LIST_ENVIRONMENTS_TOOL = "gateway_list_environments";
 const TOOL_CACHE_TTL_MS = 60_000;
 // `t3_thread_wait` holds a call open for as long as the agent asks; the agent's own client bounds it.
@@ -106,6 +107,19 @@ const isStaleConnection = (error: unknown) =>
 const clientKey = (environment: EnvironmentRow, access: McpAccess) =>
   `${environment.environmentId}\u0000${environment.endpoint}\u0000${access}`;
 
+/** A shared upstream client; an evicted one closes once its last call finishes. */
+interface PooledClient {
+  readonly client: Promise<Client>;
+  inFlight: number;
+  evicted: boolean;
+}
+
+const closeIfIdle = (pooled: PooledClient) => {
+  if (pooled.evicted && pooled.inFlight === 0) {
+    void pooled.client.then((connected) => connected.close()).catch(() => undefined);
+  }
+};
+
 interface CachedTools {
   readonly tools: ReadonlyArray<Tool>;
   readonly fetchedAt: number;
@@ -150,7 +164,7 @@ export class McpRelay extends Context.Service<
 export const make = Effect.gen(function* () {
   const environments = yield* EnvironmentRepository;
   const credentials = yield* McpUpstreamCredentials;
-  const upstreamClients = new Map<string, Promise<Client>>();
+  const upstreamClients = new Map<string, PooledClient>();
   const toolCache = new Map<string, CachedTools>();
   const context = yield* Effect.context<never>();
   const run = Effect.runPromiseWith(context);
@@ -192,11 +206,43 @@ export const make = Effect.gen(function* () {
     return client;
   };
 
-  const drop = (key: string, client: Promise<Client>) => {
-    if (upstreamClients.get(key) === client) {
+  // Eviction leaves other callers' calls running: closing the client would cancel them all.
+  const evict = (key: string, pooled: PooledClient) => {
+    if (upstreamClients.get(key) === pooled) {
       upstreamClients.delete(key);
     }
-    void client.then((connected) => connected.close()).catch(() => undefined);
+    pooled.evicted = true;
+    closeIfIdle(pooled);
+  };
+
+  const pooledClient = (key: string, environment: EnvironmentRow, access: McpAccess) => {
+    const existing = upstreamClients.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const pooled: PooledClient = {
+      client: connect(environment, access),
+      inFlight: 0,
+      evicted: false,
+    };
+    // A failed connect must not stay pooled, or every later call fails with its error.
+    pooled.client.catch(() => evict(key, pooled));
+    upstreamClients.set(key, pooled);
+    return pooled;
+  };
+
+  /** Closes clients of environments that were removed, disabled or moved to another endpoint. */
+  const pruneClients = (rows: ReadonlyArray<EnvironmentRow>) => {
+    const live = new Set(
+      rows
+        .filter((row) => row.enabled)
+        .flatMap((row) => MCP_ACCESS_LEVELS.map((access) => clientKey(row, access))),
+    );
+    for (const [key, pooled] of upstreamClients) {
+      if (!live.has(key)) {
+        evict(key, pooled);
+      }
+    }
   };
 
   /** Runs `use` on a pooled client; a stale session or rejected token reconnects once. */
@@ -209,23 +255,23 @@ export const make = Effect.gen(function* () {
       try: async () => {
         const key = clientKey(environment, access);
         for (let attempt = 0; ; attempt++) {
-          let client = upstreamClients.get(key);
-          if (client === undefined) {
-            client = connect(environment, access);
-            upstreamClients.set(key, client);
-          }
+          const pooled = pooledClient(key, environment, access);
+          pooled.inFlight++;
           try {
-            return await use(await client);
+            return await use(await pooled.client);
           } catch (error) {
             // A tool error is the call's outcome; anything else may have broken the client.
-            if (!(error instanceof McpError)) {
-              drop(key, client);
+            if (!(error instanceof McpError) || error.code === ErrorCode.ConnectionClosed) {
+              evict(key, pooled);
             }
             // The environment never ran a call it answered 401 or 404 to, so retrying is safe.
             if (attempt === 0 && isStaleConnection(error)) {
               continue;
             }
             throw error;
+          } finally {
+            pooled.inFlight--;
+            closeIfIdle(pooled);
           }
         }
       },
@@ -237,6 +283,7 @@ export const make = Effect.gen(function* () {
 
   const callerEnvironments = (caller: McpCaller) =>
     environments.listEnvironments.pipe(
+      Effect.tap((rows) => Effect.sync(() => pruneClients(rows))),
       Effect.map((rows) =>
         rows.filter(
           (row) =>
@@ -252,7 +299,8 @@ export const make = Effect.gen(function* () {
   const environmentTools = (environment: EnvironmentRow, access: McpAccess) =>
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
-      const cached = toolCache.get(environment.environmentId);
+      const cacheKey = clientKey(environment, access);
+      const cached = toolCache.get(cacheKey);
       if (cached !== undefined && now - cached.fetchedAt < TOOL_CACHE_TTL_MS) {
         return cached.tools;
       }
@@ -266,7 +314,7 @@ export const make = Effect.gen(function* () {
         } while (cursor !== undefined);
         return tools;
       });
-      toolCache.set(environment.environmentId, { tools, fetchedAt: now });
+      toolCache.set(cacheKey, { tools, fetchedAt: now });
       return tools;
     });
 
@@ -349,12 +397,16 @@ export const make = Effect.gen(function* () {
           ),
         );
       }
-      const environment = (yield* callerEnvironments(caller)).find((row) => row.slug === slug);
+      const reachable = yield* callerEnvironments(caller);
+      const environment = reachable.find((row) => row.slug === slug);
       if (environment === undefined) {
+        // A client may hold a tool list from before an environment was renamed or removed.
         return yield* Effect.fail(
           new RelayRpcError(
             ErrorCode.InvalidParams,
-            `Unknown environment ${slug}; ${LIST_ENVIRONMENTS_TOOL} lists the reachable ones`,
+            `Unknown environment ${slug}; reachable environments: ${
+              reachable.map((row) => row.slug).join(", ") || "none"
+            }`,
           ),
         );
       }
@@ -372,7 +424,14 @@ export const make = Effect.gen(function* () {
         Effect.catch((cause) =>
           cause instanceof RelayRpcError
             ? Effect.fail(cause)
-            : Effect.succeed(toolError(`Environment ${slug} is unavailable: ${cause.message}`)),
+            : // The cause names internal endpoints; the agent only needs to know the call did not run.
+              Effect.logWarning("MCP relay call failed").pipe(
+                Effect.annotateLogs({
+                  environmentId: environment.environmentId,
+                  reason: cause.message,
+                }),
+                Effect.as(toolError(`Environment ${slug} is unavailable; try again later`)),
+              ),
         ),
       );
     });
@@ -426,8 +485,8 @@ export const make = Effect.gen(function* () {
   yield* Effect.addFinalizer(() =>
     Effect.promise(() =>
       Promise.allSettled(
-        [...upstreamClients.values()].map((client) =>
-          client.then((connected) => connected.close()),
+        [...upstreamClients.values()].map((pooled) =>
+          pooled.client.then((connected) => connected.close()),
         ),
       ),
     ),

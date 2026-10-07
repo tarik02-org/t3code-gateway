@@ -453,7 +453,10 @@ export const revokeClientSession = (
     }
 
     if (response.status === 404) {
-      return yield* new EnvironmentFailure({ message: "Client session was not found" });
+      return yield* new EnvironmentFailure({
+        message: "Client session was not found",
+        status: 404,
+      });
     }
 
     if (response.status !== 200) {

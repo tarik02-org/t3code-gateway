@@ -4,8 +4,15 @@ import { PlusIcon } from "lucide-react";
 import { useEffect } from "react";
 
 import { AdminShell } from "../../components/admin-shell.tsx";
+import { TableToolbar } from "../../components/table-toolbar.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import { getCurrentUser, getGatewayStatus, listEnvironments } from "../../lib/gateway-api.ts";
+import {
+  getCurrentUser,
+  getGatewayStatus,
+  listEnvironments,
+  listMcpUpstreamCredentials,
+} from "../../lib/gateway-api.ts";
+import { MCP_UPSTREAM_QUERY_KEY } from "../mcp/query-keys.ts";
 import { AddEnvironmentDialog } from "./add-environment-dialog.tsx";
 import { useAddEnvironmentDialogStore } from "./add-environment-store.ts";
 import { EditEnvironmentDialog } from "./edit-environment-dialog.tsx";
@@ -40,6 +47,13 @@ export function EnvironmentPage() {
   const environmentsQuery = useQuery({
     queryKey: ENVIRONMENTS_QUERY_KEY,
     queryFn: listEnvironments,
+    enabled: IS_BROWSER && currentUserQuery.data != null,
+    refetchInterval: 60_000,
+  });
+
+  const mcpCredentialsQuery = useQuery({
+    queryKey: MCP_UPSTREAM_QUERY_KEY,
+    queryFn: listMcpUpstreamCredentials,
     enabled: IS_BROWSER && currentUserQuery.data != null,
     refetchInterval: 60_000,
   });
@@ -80,15 +94,13 @@ export function EnvironmentPage() {
   }
 
   return (
-    <AdminShell
-      t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}
-      actions={
+    <AdminShell t3codeWeb={gatewayStatusQuery.data?.t3codeWeb}>
+      <TableToolbar title="Environments">
         <Button size="xs" type="button" onClick={() => openAddDialog(true)}>
           <PlusIcon data-icon="inline-start" />
           Add environment
         </Button>
-      }
-    >
+      </TableToolbar>
       {environmentsQuery.error ? (
         <p className="text-xs text-destructive-foreground">
           {environmentsQuery.error instanceof Error
@@ -104,6 +116,7 @@ export function EnvironmentPage() {
       ) : (
         <EnvironmentTable
           environments={environmentsQuery.data ?? []}
+          mcpCredentials={mcpCredentialsQuery.data ?? []}
           onEdit={openEditDialog}
           onSessions={openSessionsDialog}
           onPair={openPairingDialog}

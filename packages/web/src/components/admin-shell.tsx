@@ -9,6 +9,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 
 import type { GatewayStatus, T3CodeWebChannel } from "@t3code-gateway/contracts/schemas";
 
@@ -46,11 +47,9 @@ import {
 import { GATEWAY_STATUS_QUERY_KEY } from "../features/environments/query-keys.ts";
 
 export function AdminShell({
-  actions,
   children,
   t3codeWeb,
 }: Readonly<{
-  actions?: ReactNode;
   children: ReactNode;
   t3codeWeb: GatewayStatus["t3codeWeb"] | undefined;
 }>) {
@@ -63,9 +62,30 @@ export function AdminShell({
         <div className="flex h-8 w-auto items-center">
           <T3Logo />
         </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold">Code Gateway</h1>
-        </div>
+        <h1 className="truncate text-sm font-semibold">Code Gateway</h1>
+        <nav className="ml-2 flex min-w-0 flex-1 items-center gap-1">
+          {(
+            [
+              { to: "/", label: "Environments" },
+              { to: "/connections", label: "Connections" },
+            ] as const
+          ).map((item) => (
+            <Button
+              key={item.to}
+              size="xs"
+              variant="ghost"
+              render={
+                <Link
+                  to={item.to}
+                  activeOptions={{ exact: true }}
+                  activeProps={{ className: "bg-accent text-accent-foreground" }}
+                />
+              }
+            >
+              {item.label}
+            </Button>
+          ))}
+        </nav>
         <Button size="xs" variant="outline" onClick={() => setPasswordOpen(true)}>
           Reset password
         </Button>
@@ -81,10 +101,9 @@ export function AdminShell({
             </Button>
           </>
         ) : null}
-        {actions}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-7 sm:px-8 sm:py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-6">
           {children}
         </div>
       </div>

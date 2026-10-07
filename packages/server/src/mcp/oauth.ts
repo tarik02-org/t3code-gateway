@@ -287,15 +287,8 @@ export const make = Effect.gen(function* () {
 
   const register = (registration: McpClientRegistration) =>
     Effect.gen(function* () {
-      if (
-        registration.token_endpoint_auth_method !== undefined &&
-        registration.token_endpoint_auth_method !== "none"
-      ) {
-        return yield* new McpOAuthRegistrationError({
-          error: "invalid_client_metadata",
-          description: "Only public clients are supported (token_endpoint_auth_method none)",
-        });
-      }
+      // RFC 7591 §3.2.1 lets the server replace requested metadata: every client is public here,
+      // and the response tells it so with token_endpoint_auth_method "none".
       const redirectUris = [...new Set(registration.redirect_uris ?? [])];
       if (redirectUris.length === 0 || redirectUris.length > MAX_REDIRECT_URIS) {
         return yield* new McpOAuthRegistrationError({

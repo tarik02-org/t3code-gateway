@@ -165,16 +165,11 @@ export const make = Effect.gen(function* () {
       Effect.gen(function* () {
         yield* db.delete(mcpTokens).where(lte(mcpTokens.expiresAt, now)).run();
         yield* db.delete(mcpGrants).where(lte(mcpGrants.expiresAt, now)).run();
-        // An OAuth grant whose refresh token lapsed can never be used again.
+        // A grant without tokens (lapsed refresh token, or revoked through /oauth/revoke) can never be used again.
         yield* db
           .delete(mcpGrants)
           .where(
-            and(
-              eq(mcpGrants.kind, "oauth"),
-              notExists(
-                db.select().from(mcpTokens).where(eq(mcpTokens.grantId, mcpGrants.grantId)),
-              ),
-            ),
+            notExists(db.select().from(mcpTokens).where(eq(mcpTokens.grantId, mcpGrants.grantId))),
           )
           .run();
       }),

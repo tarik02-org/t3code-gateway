@@ -42,6 +42,14 @@ const readAuthorization = (): McpAuthorizationRequest => {
   return request;
 };
 
+/** Where the code goes; an app's own scheme has no web origin (`origin` is "null"). */
+const redirectTarget = (redirectUri: string) => {
+  const url = new URL(redirectUri);
+  return url.protocol === "http:" || url.protocol === "https:"
+    ? url.origin
+    : `${url.protocol}//${url.host}`;
+};
+
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof Error ? cause.message : fallback;
 
@@ -121,7 +129,7 @@ export function ConnectPage() {
                 will return to{" "}
               </span>
               <span className="break-all font-mono text-xs">
-                {new URL(pending.redirectUri).origin}
+                {redirectTarget(pending.redirectUri)}
               </span>
               <span className="text-muted-foreground">.</span>
             </p>
