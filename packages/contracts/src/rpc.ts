@@ -6,6 +6,11 @@ import {
   AuthFailure,
   ChangePasswordRequest,
   CheckT3CodeWebUpdatesRequest,
+  CreatedMcpToken,
+  CreateMcpTokenRequest,
+  McpFailure,
+  McpGrant,
+  McpUpstreamCredentialStatus,
   InstallT3CodeWebReleaseRequest,
   SetT3CodeWebVersionPinRequest,
   T3CodeWebVersionRequest,
@@ -196,6 +201,33 @@ export class GetTraefikConfig extends Rpc.make("gateway.traefik.config", {
   success: TraefikConfigResponse,
 }).middleware(GatewaySessionMiddleware) {}
 
+export const McpGrantIdPayload = Schema.Struct({
+  grantId: Schema.String,
+});
+
+export type McpGrantIdPayload = typeof McpGrantIdPayload.Type;
+
+export class ListMcpGrants extends Rpc.make("gateway.mcp.grants.list", {
+  success: Schema.Array(McpGrant),
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class CreateMcpToken extends Rpc.make("gateway.mcp.tokens.create", {
+  payload: CreateMcpTokenRequest,
+  success: CreatedMcpToken,
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class RevokeMcpGrant extends Rpc.make("gateway.mcp.grants.revoke", {
+  payload: McpGrantIdPayload,
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export class ListMcpUpstreamCredentials extends Rpc.make("gateway.mcp.upstream.list", {
+  success: Schema.Array(McpUpstreamCredentialStatus),
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
 export class GatewayRpcs extends RpcGroup.make(
   GetCurrentUser,
   ChangePassword,
@@ -212,6 +244,10 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateT3CodeCatalogEntry,
   RevokeEnvironmentClient,
   GetTraefikConfig,
+  ListMcpGrants,
+  CreateMcpToken,
+  RevokeMcpGrant,
+  ListMcpUpstreamCredentials,
   UpdateT3CodeWebSettings,
   CheckT3CodeWebUpdates,
   ListT3CodeWebReleases,

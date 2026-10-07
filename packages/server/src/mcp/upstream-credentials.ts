@@ -1,4 +1,4 @@
-import type { McpAccess } from "@t3code-gateway/contracts/schemas";
+import type { McpAccess, McpUpstreamCredentialStatus } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -44,6 +44,13 @@ export class McpUpstreamCredentials extends Context.Service<
       environmentId: string,
       access: McpAccess,
     ) => Effect.Effect<string, EnvironmentFailure | DatabaseError>;
+    /** Drops a token the environment rejected, so the next `ensure` signs in again. */
+    readonly invalidate: (
+      environmentId: string,
+      access: McpAccess,
+      token: string,
+    ) => Effect.Effect<void, DatabaseError>;
+    readonly listStatus: Effect.Effect<ReadonlyArray<McpUpstreamCredentialStatus>, DatabaseError>;
     /** Rotates every stored credential that is due. */
     readonly sweep: Effect.Effect<void>;
     /** Signs the gateway's MCP sessions out of an environment before it is removed. */
@@ -175,15 +182,48 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const ensure = (environmentId: string, access: McpAccess) => {
+  const lockFor = (environmentId: string, access: McpAccess) => {
     const key = `${environmentId}\u0000${access}`;
     let lock = locks.get(key);
     if (lock === undefined) {
       lock = Semaphore.makeUnsafe(1);
       locks.set(key, lock);
     }
-    return lock.withPermit(maintain(environmentId, access));
+    return lock;
   };
+
+  const ensure = (environmentId: string, access: McpAccess) =>
+    lockFor(environmentId, access).withPermit(maintain(environmentId, access));
+
+  const invalidate = (environmentId: string, access: McpAccess, token: string) =>
+    lockFor(environmentId, access).withPermit(
+      Effect.gen(function* () {
+        const row = yield* credentialRepository.findCredential(environmentId, access);
+        if (row?.tokenEncrypted == null || row.sessionId === null) {
+          return;
+        }
+        const stored = yield* secrets
+          .decrypt(row.tokenEncrypted)
+          .pipe(Effect.mapError(secretFailure));
+        if (stored === token) {
+          yield* credentialRepository.clearToken(environmentId, access, row.sessionId);
+        }
+      }),
+    );
+
+  const listStatus = credentialRepository.listCredentials.pipe(
+    Effect.map((rows) =>
+      rows.map(
+        (row): McpUpstreamCredentialStatus => ({
+          environmentId: row.environmentId,
+          access: row.access,
+          expiresAt: row.expiresAt,
+          lastAttemptAt: row.lastAttemptAt,
+          lastFailure: row.lastFailure,
+        }),
+      ),
+    ),
+  );
 
   const sweep = Effect.gen(function* () {
     const environments = yield* environmentRepository.listEnvironments;
@@ -240,7 +280,13 @@ export const make = Effect.gen(function* () {
       ),
     );
 
-  return McpUpstreamCredentials.of({ ensure, sweep, revokeEnvironment });
+  return McpUpstreamCredentials.of({
+    ensure,
+    invalidate,
+    listStatus,
+    sweep,
+    revokeEnvironment,
+  });
 });
 
 export const layer = Layer.effect(McpUpstreamCredentials, make);

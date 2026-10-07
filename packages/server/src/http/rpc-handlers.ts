@@ -4,6 +4,7 @@ import {
   CreateT3CodeCatalogEntryPayload,
   EnvironmentIdPayload,
   GatewayRpcs,
+  McpGrantIdPayload,
   RevokeEnvironmentClientPayload,
   UpdateEnvironmentPayload,
   ValidateEnvironmentForEditPayload,
@@ -12,7 +13,9 @@ import {
   AuthFailure,
   ChangePasswordRequest,
   EnvironmentFailure,
+  CreateMcpTokenRequest,
   EnvironmentInput,
+  McpFailure,
 } from "@t3code-gateway/contracts/schemas";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -20,6 +23,8 @@ import * as Layer from "effect/Layer";
 import { AuthService } from "../auth/service.ts";
 import type { DatabaseError } from "../db/errors.ts";
 import { EnvironmentService } from "../environments/service.ts";
+import { McpGrants } from "../mcp/grants.ts";
+import { McpUpstreamCredentials } from "../mcp/upstream-credentials.ts";
 import { T3CodeWebService } from "../t3code-web/service.ts";
 import { TraefikReconciler } from "../traefik/reconciler.ts";
 import { buildGatewayStatus } from "./status.ts";
@@ -35,12 +40,23 @@ const environmentRpcErrors = {
   ...environmentRpcDatabaseErrors,
 };
 
+const mcpRpcDatabaseErrors = {
+  DatabaseError: (error: DatabaseError) => Effect.fail(new McpFailure({ message: error.message })),
+};
+
+const mcpRpcErrors = {
+  McpFailure: (error: McpFailure) => Effect.fail(error),
+  ...mcpRpcDatabaseErrors,
+};
+
 export const layer = GatewayRpcs.toLayer(
   Effect.gen(function* () {
     const auth = yield* AuthService;
     const environments = yield* EnvironmentService;
     const traefik = yield* TraefikReconciler;
     const t3codeWeb = yield* T3CodeWebService;
+    const mcpGrants = yield* McpGrants;
+    const mcpCredentials = yield* McpUpstreamCredentials;
 
     return GatewayRpcs.of({
       "gateway.auth.me": () =>
@@ -164,6 +180,21 @@ export const layer = GatewayRpcs.toLayer(
           .pipe(Effect.catchTags(environmentRpcErrors)),
 
       "gateway.traefik.config": () => traefik.getConfig(),
+
+      "gateway.mcp.grants.list": () => mcpGrants.list.pipe(Effect.catchTags(mcpRpcDatabaseErrors)),
+
+      "gateway.mcp.tokens.create": (payload: CreateMcpTokenRequest) =>
+        Effect.gen(function* () {
+          const { sessionToken } = yield* GatewayRequestContext;
+          const user = yield* auth.currentUser(sessionToken);
+          return yield* mcpGrants.createToken(payload, user?.id ?? null);
+        }).pipe(Effect.catchTags(mcpRpcErrors)),
+
+      "gateway.mcp.grants.revoke": (payload: McpGrantIdPayload) =>
+        mcpGrants.revoke(payload.grantId).pipe(Effect.catchTags(mcpRpcErrors)),
+
+      "gateway.mcp.upstream.list": () =>
+        mcpCredentials.listStatus.pipe(Effect.catchTags(mcpRpcDatabaseErrors)),
     });
   }),
 ).pipe(Layer.provide(gatewaySessionMiddlewareLayer));

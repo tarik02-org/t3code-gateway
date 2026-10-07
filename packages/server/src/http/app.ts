@@ -20,6 +20,10 @@ import { GatewayDatabase, layer as gatewayDatabaseLayer } from "../db/database.t
 import { layer as authRepositoryLayer } from "../db/auth-repository.ts";
 import { layer as environmentRepositoryLayer } from "../db/environment-repository.ts";
 import { layer as mcpUpstreamCredentialRepositoryLayer } from "../db/mcp-upstream-credential-repository.ts";
+import { layer as mcpGrantRepositoryLayer } from "../db/mcp-grant-repository.ts";
+import { layer as mcpGrantsLayer } from "../mcp/grants.ts";
+import { layer as mcpRelayLayer } from "../mcp/relay.ts";
+import { layer as mcpRoutesLayer } from "./mcp-routes.ts";
 import { SettingsRepositoryLive } from "../db/settings-repository.ts";
 import {
   AdminTokenRotation,
@@ -81,6 +85,17 @@ const mcpUpstreamCredentialsLiveLayer = mcpUpstreamCredentialsLayer.pipe(
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(environmentRepositoryLiveLayer),
   Layer.provide(foundationLayer),
+);
+
+const mcpGrantsLiveLayer = mcpGrantsLayer.pipe(
+  Layer.provide(mcpGrantRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
+  Layer.provide(environmentRepositoryLiveLayer),
+  Layer.provide(foundationLayer),
+);
+
+const mcpRelayLiveLayer = mcpRelayLayer.pipe(
+  Layer.provide(mcpUpstreamCredentialsLiveLayer),
+  Layer.provide(environmentRepositoryLiveLayer),
 );
 
 const environmentLiveLayer = environmentServiceLayer.pipe(
@@ -158,7 +173,11 @@ const routesLayer = Layer.mergeAll(
   environmentRoutesLayer,
   t3codeWebRoutesLayer,
   traefikRoutesLayer,
+  mcpRoutesLayer,
 ).pipe(
+  Layer.provideMerge(mcpRelayLiveLayer),
+  Layer.provideMerge(mcpGrantsLiveLayer),
+  Layer.provideMerge(mcpUpstreamCredentialsLiveLayer),
   HttpRouter.provideRequest(configLayer),
   Layer.provideMerge(traefikLiveLayer),
   Layer.provideMerge(environmentLiveLayer),

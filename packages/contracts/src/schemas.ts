@@ -357,3 +357,56 @@ export const McpAccess = Schema.Literals([
 ]);
 
 export type McpAccess = typeof McpAccess.Type;
+
+/** How a relay client signs in to the gateway: a token created in the gateway, or OAuth. */
+export const McpGrantKind = Schema.Literals(["token", "oauth"]);
+
+export type McpGrantKind = typeof McpGrantKind.Type;
+
+/** What one relay client may do: which environments it reaches and with what access. */
+export const McpGrant = Schema.Struct({
+  grantId: Schema.String,
+  kind: McpGrantKind,
+  label: Schema.String,
+  access: McpAccess,
+  /** `null` reaches every environment, including ones added later. */
+  environmentIds: Schema.NullOr(Schema.Array(Schema.String)),
+  createdAt: Schema.String,
+  lastUsedAt: Schema.NullOr(Schema.String),
+  expiresAt: Schema.NullOr(Schema.String),
+});
+
+export type McpGrant = typeof McpGrant.Type;
+
+export const CreateMcpTokenRequest = Schema.Struct({
+  label: Schema.String,
+  access: McpAccess,
+  environmentIds: Schema.NullOr(Schema.Array(Schema.String)),
+  /** `null` never expires. */
+  expiresInDays: Schema.NullOr(Schema.Int),
+});
+
+export type CreateMcpTokenRequest = typeof CreateMcpTokenRequest.Type;
+
+export const CreatedMcpToken = Schema.Struct({
+  grant: McpGrant,
+  /** Shown once; the gateway stores only its hash. */
+  token: Schema.String,
+});
+
+export type CreatedMcpToken = typeof CreatedMcpToken.Type;
+
+/** The gateway's own sign-in to one environment's MCP server at one access level. */
+export const McpUpstreamCredentialStatus = Schema.Struct({
+  environmentId: Schema.String,
+  access: McpAccess,
+  expiresAt: Schema.NullOr(Schema.String),
+  lastAttemptAt: Schema.NullOr(Schema.String),
+  lastFailure: Schema.NullOr(Schema.String),
+});
+
+export type McpUpstreamCredentialStatus = typeof McpUpstreamCredentialStatus.Type;
+
+export class McpFailure extends Schema.TaggedErrorClass<McpFailure>()("McpFailure", {
+  message: Schema.String,
+}) {}

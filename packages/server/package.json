@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@t3code-gateway/contracts": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
     "effect": "catalog:",
