@@ -204,6 +204,7 @@ export const UpdateEnvironmentRequest = Schema.Struct({
   adminBearerToken: Schema.optional(Schema.String),
   browserTokenScopes: Schema.optional(Schema.Array(Schema.String)),
   enabled: Schema.optional(Schema.Boolean),
+  mcpEnabled: Schema.optional(Schema.Boolean),
 });
 
 export type UpdateEnvironmentRequest = typeof UpdateEnvironmentRequest.Type;
@@ -242,6 +243,8 @@ export const EnvironmentRecord = Schema.Struct({
   slug: Schema.String,
   label: Schema.String,
   enabled: Schema.Boolean,
+  /** Whether agents reach this environment through the gateway's MCP relay. */
+  mcpEnabled: Schema.Boolean,
   endpoint: Schema.String,
   publicUrl: Schema.String,
   descriptor: Schema.optional(Schema.Unknown),

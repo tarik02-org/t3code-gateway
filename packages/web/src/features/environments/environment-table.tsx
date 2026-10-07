@@ -20,7 +20,6 @@ import {
   createT3CodeCatalogEntry,
   deleteEnvironment,
   updateEnvironment,
-  signOutMcpUpstream,
 } from "../../lib/gateway-api.ts";
 import { cn } from "../../lib/utils.ts";
 import { mcpAccessTitle } from "../mcp/mcp-access.ts";
@@ -103,7 +102,7 @@ export function EnvironmentTable({
                 <AdminTokenStatusBadge environment={environment} />
               </td>
               <td className="px-2 py-3 text-center">
-                <McpStatusBadge
+                <McpSwitch
                   environment={environment}
                   credentials={mcpCredentials.filter(
                     (credential) => credential.environmentId === environment.environmentId,
@@ -146,8 +145,12 @@ const formatDate = (value: string) =>
     timeStyle: "short",
   }).format(new Date(value));
 
-/** The gateway's own MCP sign-ins to an environment, one per access level agents use. */
-function McpStatusBadge({
+/**
+ * Whether agents reach the environment through the relay. The gateway signs in
+ * on first use and signs out when this is turned off; a failing sign-in shows
+ * next to the switch.
+ */
+function McpSwitch({
   environment,
   credentials,
 }: Readonly<{
@@ -155,79 +158,51 @@ function McpStatusBadge({
   credentials: ReadonlyArray<McpUpstreamCredentialStatus>;
 }>) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const signOutMutation = useMutation({
-    mutationFn: () => signOutMcpUpstream(environment.environmentId),
+  const mutation = useMutation({
+    mutationFn: (mcpEnabled: boolean) =>
+      updateEnvironment(environment.environmentId, { mcpEnabled }),
     onSuccess: async () => {
-      setOpen(false);
-      toastManager.add({ type: "success", title: `Signed out of ${environment.label}` });
+      await queryClient.invalidateQueries({ queryKey: ENVIRONMENTS_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: MCP_UPSTREAM_QUERY_KEY });
     },
     onError: (cause) => {
       toastManager.add({
         type: "error",
-        title: "Could not sign out",
-        description: errorMessage(cause, "The environment did not revoke the sign-in."),
+        title: "Update failed",
+        description: errorMessage(cause, "Could not update environment."),
       });
     },
   });
-
-  const failing = credentials.filter((credential) => credential.lastFailure !== null);
-  const signedOut = failing.some((credential) => credential.expiresAt === null);
-  const [label, variant] =
-    credentials.length === 0
-      ? (["Unused", "ghost"] as const)
-      : failing.length === 0
-        ? (["Signed in", "secondary"] as const)
-        : signedOut
-          ? (["Failing", "destructive"] as const)
-          : (["Retrying", "outline"] as const);
+  const failures = environment.mcpEnabled
+    ? credentials.filter((credential) => credential.lastFailure !== null)
+    : [];
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Badge render={<button type="button" />} variant={variant} />}>
-        {label}
-      </PopoverTrigger>
-      <PopoverPopup className="w-72" side="bottom">
-        {credentials.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            The gateway signs in the first time an agent uses this environment over MCP.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <ul className="flex flex-col gap-1.5 text-xs">
-              {credentials.map((credential) => (
-                <li className="flex flex-col" key={credential.access}>
-                  <span className="font-medium">{mcpAccessTitle(credential.access)}</span>
-                  <span
-                    className={
-                      credential.lastFailure === null
-                        ? "text-muted-foreground"
-                        : "text-destructive-foreground"
-                    }
-                  >
-                    {credential.lastFailure ??
-                      (credential.expiresAt === null
-                        ? "Not signed in"
-                        : `Renews before ${formatDate(credential.expiresAt)}`)}
-                  </span>
-                </li>
+    <span className="inline-flex items-center gap-1.5">
+      <Switch
+        aria-label={`MCP for ${environment.label}`}
+        checked={environment.mcpEnabled}
+        disabled={mutation.isPending || !environment.enabled}
+        onCheckedChange={(checked) => mutation.mutate(checked)}
+      />
+      {failures.length === 0 ? null : (
+        <Tooltip>
+          <TooltipTrigger
+            render={<button type="button" aria-label="MCP sign-in failing" />}
+            className="size-2 rounded-full bg-destructive"
+          />
+          <TooltipContent>
+            <div className="flex flex-col gap-1">
+              {failures.map((credential) => (
+                <p key={credential.access}>
+                  {mcpAccessTitle(credential.access)}: {credential.lastFailure}
+                </p>
               ))}
-            </ul>
-            <Button
-              className="self-end"
-              size="xs"
-              type="button"
-              variant="outline"
-              disabled={signOutMutation.isPending}
-              onClick={() => signOutMutation.mutate()}
-            >
-              {signOutMutation.isPending ? "Signing out..." : "Sign out"}
-            </Button>
-          </div>
-        )}
-      </PopoverPopup>
-    </Popover>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </span>
   );
 }
 

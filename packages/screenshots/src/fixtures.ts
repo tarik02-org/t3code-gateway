@@ -79,6 +79,7 @@ const environments = environmentEntries.map(([slug, label]) => ({
   slug,
   label,
   enabled: true,
+  mcpEnabled: true,
   endpoint: `https://${slug}.internal.example.com`,
   publicUrl: `https://${slug}.code.example.com/`,
   browserTokenScopes,

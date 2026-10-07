@@ -31,6 +31,8 @@ export const environments = sqliteTable("environments", {
   slug: text("slug").notNull().unique(),
   label: text("label").notNull(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  /** Whether the gateway's MCP relay reaches this environment. */
+  mcpEnabled: integer("mcp_enabled", { mode: "boolean" }).notNull().default(true),
   endpoint: text("endpoint").notNull(),
   descriptorJson: text("descriptor_json"),
   browserTokenScopesJson: text("browser_token_scopes_json").notNull(),

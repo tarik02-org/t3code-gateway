@@ -235,7 +235,7 @@ export const make = Effect.gen(function* () {
   const pruneClients = (rows: ReadonlyArray<EnvironmentRow>) => {
     const live = new Set(
       rows
-        .filter((row) => row.enabled)
+        .filter((row) => row.enabled && row.mcpEnabled)
         .flatMap((row) => MCP_ACCESS_LEVELS.map((access) => clientKey(row, access))),
     );
     for (const [key, pooled] of upstreamClients) {
@@ -288,6 +288,7 @@ export const make = Effect.gen(function* () {
         rows.filter(
           (row) =>
             row.enabled &&
+            row.mcpEnabled &&
             (caller.environmentIds === null || caller.environmentIds.includes(row.environmentId)),
         ),
       ),
