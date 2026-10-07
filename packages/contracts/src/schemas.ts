@@ -324,7 +324,8 @@ export const EnvironmentClientSessionMethod = Schema.Literals([
 
 export type EnvironmentClientSessionMethod = typeof EnvironmentClientSessionMethod.Type;
 
-export const EnvironmentClientGatewayRole = Schema.Literals(["admin"]);
+/** A session the gateway itself holds: its admin token, or its MCP relay sign-in. */
+export const EnvironmentClientGatewayRole = Schema.Literals(["admin", "mcp-relay"]);
 
 export type EnvironmentClientGatewayRole = typeof EnvironmentClientGatewayRole.Type;
 

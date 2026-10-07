@@ -38,6 +38,12 @@ export default defineConfig({
           },
         },
         {
+          path: "/admin/sessions",
+          prerender: {
+            crawlLinks: false,
+          },
+        },
+        {
           path: "/admin/connections",
           prerender: {
             crawlLinks: false,
