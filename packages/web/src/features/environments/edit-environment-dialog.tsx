@@ -25,6 +25,7 @@ export function EditEnvironmentDialog() {
   const endpoint = useEditEnvironmentDialogStore((state) => state.endpoint);
   const pairingCode = useEditEnvironmentDialogStore((state) => state.pairingCode);
   const enabled = useEditEnvironmentDialogStore((state) => state.enabled);
+  const mcpEnabled = useEditEnvironmentDialogStore((state) => state.mcpEnabled);
   const error = useEditEnvironmentDialogStore((state) => state.error);
   const setOpen = useEditEnvironmentDialogStore((state) => state.setOpen);
   const setLabel = useEditEnvironmentDialogStore((state) => state.setLabel);
@@ -32,6 +33,7 @@ export function EditEnvironmentDialog() {
   const setEndpoint = useEditEnvironmentDialogStore((state) => state.setEndpoint);
   const setPairingCode = useEditEnvironmentDialogStore((state) => state.setPairingCode);
   const setEnabled = useEditEnvironmentDialogStore((state) => state.setEnabled);
+  const setMcpEnabled = useEditEnvironmentDialogStore((state) => state.setMcpEnabled);
   const setError = useEditEnvironmentDialogStore((state) => state.setError);
   const reset = useEditEnvironmentDialogStore((state) => state.reset);
   const canSubmit =
@@ -81,6 +83,7 @@ export function EditEnvironmentDialog() {
                 label,
                 endpoint,
                 enabled,
+                mcpEnabled,
                 ...(pairingCode.length > 0 ? { pairingCode } : {}),
               });
             }}
@@ -103,6 +106,16 @@ export function EditEnvironmentDialog() {
               <label className="flex items-center justify-between gap-3 text-sm">
                 <span>Enabled</span>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex flex-col">
+                  <span>MCP</span>
+                  <span className="text-xs text-muted-foreground">
+                    Agents reach this environment through the gateway. Turning it off signs the
+                    gateway out.
+                  </span>
+                </span>
+                <Switch checked={mcpEnabled} onCheckedChange={setMcpEnabled} />
               </label>
               {error !== null ? (
                 <p className="text-sm text-destructive-foreground">{error}</p>

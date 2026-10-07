@@ -92,6 +92,7 @@ const rowToRecord = (
     slug: row.slug,
     label: row.label,
     enabled: row.enabled,
+    mcpEnabled: row.mcpEnabled,
     endpoint: row.endpoint,
     publicUrl: publicUrls.publicHttpBaseUrl,
     descriptor:
@@ -160,6 +161,7 @@ export const make = Effect.gen(function* () {
         slug: validated.slug,
         label: validated.label,
         enabled: true,
+        mcpEnabled: true,
         endpoint: validated.endpoint,
         descriptorJson: encodeUnknownJson(validated.descriptor),
         browserTokenScopesJson: encodeStringArrayJson(validated.browserTokenScopes),
@@ -175,6 +177,24 @@ export const make = Effect.gen(function* () {
     });
 
   const update = (environmentId: string, input: UpdateEnvironmentRequest) =>
+    updateFields(environmentId, input).pipe(
+      Effect.tap((record) =>
+        // Turning MCP off signs the gateway out; turning it on needs nothing, since it signs in on demand.
+        input.mcpEnabled === false && !record.mcpEnabled
+          ? mcpCredentials
+              .signOut(environmentId)
+              .pipe(
+                Effect.catchTag("EnvironmentFailure", (error) =>
+                  Effect.logWarning("Could not sign MCP relay out of disabled environment").pipe(
+                    Effect.annotateLogs({ environmentId, reason: error.message }),
+                  ),
+                ),
+              )
+          : Effect.void,
+      ),
+    );
+
+  const updateFields = (environmentId: string, input: UpdateEnvironmentRequest) =>
     Effect.gen(function* () {
       const existing = yield* environmentRepository.findEnvironment(environmentId);
 
@@ -263,6 +283,7 @@ export const make = Effect.gen(function* () {
             adminTokenLastCheckedAt: validated.adminTokenLastCheckedAt,
             adminTokenFailureJson: null,
             enabled: input.enabled ?? current.enabled,
+            mcpEnabled: input.mcpEnabled ?? current.mcpEnabled,
             updatedAt: DateTime.formatIso(yield* DateTime.now),
           });
           if (updated) {
@@ -308,6 +329,7 @@ export const make = Effect.gen(function* () {
           input.browserTokenScopes ?? decodeStringArrayJson(existing.browserTokenScopesJson),
         ),
         enabled: input.enabled ?? existing.enabled,
+        mcpEnabled: input.mcpEnabled ?? existing.mcpEnabled,
         updatedAt: DateTime.formatIso(yield* DateTime.now),
       });
 

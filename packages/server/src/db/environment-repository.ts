@@ -12,6 +12,7 @@ export interface EnvironmentRow {
   readonly slug: string;
   readonly label: string;
   readonly enabled: boolean;
+  readonly mcpEnabled: boolean;
   readonly endpoint: string;
   readonly descriptorJson: string | null;
   readonly browserTokenScopesJson: string;
@@ -28,6 +29,7 @@ export interface CreateEnvironmentInput {
   readonly slug: string;
   readonly label: string;
   readonly enabled: boolean;
+  readonly mcpEnabled: boolean;
   readonly endpoint: string;
   readonly descriptorJson: string;
   readonly browserTokenScopesJson: string;
@@ -46,6 +48,7 @@ interface UpdateEnvironmentFields {
   readonly descriptorJson: string;
   readonly browserTokenScopesJson: string;
   readonly enabled: boolean;
+  readonly mcpEnabled: boolean;
   readonly updatedAt: string;
 }
 
@@ -147,6 +150,7 @@ export const make = Effect.gen(function* () {
               descriptorJson: input.descriptorJson,
               browserTokenScopesJson: input.browserTokenScopesJson,
               enabled: input.enabled,
+              mcpEnabled: input.mcpEnabled,
               updatedAt: input.updatedAt,
             }
           : {
@@ -160,6 +164,7 @@ export const make = Effect.gen(function* () {
               adminTokenLastCheckedAt: input.adminTokenLastCheckedAt,
               adminTokenFailureJson: input.adminTokenFailureJson,
               enabled: input.enabled,
+              mcpEnabled: input.mcpEnabled,
               updatedAt: input.updatedAt,
             },
       )

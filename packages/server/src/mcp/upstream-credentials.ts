@@ -118,6 +118,9 @@ export const make = Effect.gen(function* () {
     if (!environment.enabled) {
       return yield* new EnvironmentFailure({ message: "Environment is disabled" });
     }
+    if (!environment.mcpEnabled) {
+      return yield* new EnvironmentFailure({ message: "MCP is turned off for this environment" });
+    }
 
     const row = yield* credentialRepository.findCredential(environmentId, access);
     const now = yield* DateTime.now;
@@ -242,7 +245,9 @@ export const make = Effect.gen(function* () {
   const sweep = Effect.gen(function* () {
     const environments = yield* environmentRepository.listEnvironments;
     const enabled = new Set(
-      environments.filter((environment) => environment.enabled).map((row) => row.environmentId),
+      environments
+        .filter((environment) => environment.enabled && environment.mcpEnabled)
+        .map((row) => row.environmentId),
     );
     const credentials = yield* credentialRepository.listCredentials;
     yield* Effect.forEach(

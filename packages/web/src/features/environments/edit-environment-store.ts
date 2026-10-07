@@ -9,6 +9,7 @@ interface EditEnvironmentDialogState {
   readonly endpoint: string;
   readonly pairingCode: string;
   readonly enabled: boolean;
+  readonly mcpEnabled: boolean;
   readonly error: string | null;
   readonly openFor: (environment: EnvironmentRecord) => void;
   readonly setOpen: (open: boolean) => void;
@@ -17,6 +18,7 @@ interface EditEnvironmentDialogState {
   readonly setEndpoint: (endpoint: string) => void;
   readonly setPairingCode: (pairingCode: string) => void;
   readonly setEnabled: (enabled: boolean) => void;
+  readonly setMcpEnabled: (mcpEnabled: boolean) => void;
   readonly setError: (error: string | null) => void;
   readonly reset: () => void;
 }
@@ -29,6 +31,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
   endpoint: "",
   pairingCode: "",
   enabled: true,
+  mcpEnabled: true,
   error: null,
   openFor: (environment) =>
     set({
@@ -39,6 +42,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
       endpoint: environment.endpoint,
       pairingCode: "",
       enabled: environment.enabled,
+      mcpEnabled: environment.mcpEnabled,
       error: null,
     }),
   setOpen: (open) => set({ open }),
@@ -47,6 +51,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
   setEndpoint: (endpoint) => set({ endpoint }),
   setPairingCode: (pairingCode) => set({ pairingCode }),
   setEnabled: (enabled) => set({ enabled }),
+  setMcpEnabled: (mcpEnabled) => set({ mcpEnabled }),
   setError: (error) => set({ error }),
   reset: () =>
     set({
@@ -57,6 +62,7 @@ export const useEditEnvironmentDialogStore = create<EditEnvironmentDialogState>(
       endpoint: "",
       pairingCode: "",
       enabled: true,
+      mcpEnabled: true,
       error: null,
     }),
 }));
