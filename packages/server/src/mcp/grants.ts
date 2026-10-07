@@ -153,13 +153,9 @@ export const make = Effect.gen(function* () {
         lastUsedAt: null,
         expiresAt,
       };
-      yield* grants.createGrant(row, {
-        tokenHash,
-        grantId: row.grantId,
-        kind: "access",
-        expiresAt,
-        createdAt,
-      });
+      yield* grants.createGrant(row, [
+        { tokenHash, grantId: row.grantId, kind: "access", expiresAt, createdAt },
+      ]);
       return { grant: grantRecord(row), token } satisfies CreatedMcpToken;
     }).pipe(Effect.catchTags({ PlatformError: platformFailure }));
 

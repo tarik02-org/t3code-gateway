@@ -41,8 +41,8 @@ const sessionRequiredFor = (
     return false;
   }
 
-  // Relay clients authenticate with their own bearer tokens.
-  if (path === MCP_PATH) {
+  // Relay clients authenticate with their own bearer tokens, and sign in through OAuth to get them.
+  if (path === MCP_PATH || path.startsWith("/oauth/") || path.startsWith("/.well-known/oauth-")) {
     return false;
   }
 
@@ -79,7 +79,12 @@ const unauthenticatedResponse = (
   const path = pathname(request.url);
 
   if (path === "/admin" || path.startsWith("/admin/") || !path.startsWith("/api/")) {
-    return Effect.succeed(HttpServerResponse.redirect("/admin/login", { status: 302 }));
+    // Login returns to the admin page the user was on, such as an OAuth consent.
+    const target = new URL(request.url, "http://gateway.local");
+    const next = path.startsWith("/admin/")
+      ? `?next=${encodeURIComponent(target.pathname + target.search)}`
+      : "";
+    return Effect.succeed(HttpServerResponse.redirect(`/admin/login${next}`, { status: 302 }));
   }
 
   return Effect.succeed(

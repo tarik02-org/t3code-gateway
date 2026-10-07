@@ -22,6 +22,12 @@ function LoginPage() {
     mutationFn: login,
     onSuccess: async () => {
       setError(null);
+      const next = new URLSearchParams(window.location.search).get("next");
+      // Only admin pages: an open redirect would hand the session to another site.
+      if (next !== null && next.startsWith("/admin/") && !next.startsWith("/admin/login")) {
+        window.location.assign(next);
+        return;
+      }
       await navigate({ to: "/" });
     },
     onError: (cause) => {

@@ -4,6 +4,7 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
+import { GatewayRuntimeConfig } from "../config.ts";
 import { McpGrants } from "../mcp/grants.ts";
 import { McpRelay, McpRelayError } from "../mcp/relay.ts";
 import { requestOrigin } from "./request-origin.ts";
@@ -26,10 +27,11 @@ export const layer = Layer.effectDiscard(
     const router = yield* HttpRouter.HttpRouter;
     const grants = yield* McpGrants;
     const relay = yield* McpRelay;
+    const config = yield* GatewayRuntimeConfig;
 
     const handler = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const origin = requestOrigin(request);
+      const origin = requestOrigin(request.headers, config.publicUrl);
 
       // Agents call from processes, not pages: a page on another origin must not drive the relay.
       const callerOrigin = request.headers["origin"];
@@ -41,10 +43,9 @@ export const layer = Layer.effectDiscard(
       const caller = bearerToken === null ? null : yield* grants.authenticate(bearerToken);
       if (caller === null) {
         return jsonRpcError(401, "A valid T3 Code Gateway MCP credential is required", {
-          "www-authenticate":
-            bearerToken === null
-              ? 'Bearer realm="t3code-gateway"'
-              : 'Bearer realm="t3code-gateway", error="invalid_token"',
+          "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"${
+            bearerToken === null ? "" : ', error="invalid_token"'
+          }`,
         });
       }
 
