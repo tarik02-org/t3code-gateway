@@ -67,7 +67,7 @@ export function AdminShell({
           {(
             [
               { to: "/", label: "Environments" },
-              { to: "/mcp", label: "MCP" },
+              { to: "/mcp", label: "Connections" },
             ] as const
           ).map((item) => (
             <Button
