@@ -2,7 +2,7 @@
 
 T3 Code Gateway manages multiple self-hosted T3 Code environments behind one public entry point.
 It provides an admin UI, optional T3 Code Web, Traefik routes, encrypted environment credentials,
-pairing links, and client session controls.
+pairing links, client session controls, and one MCP server that relays every environment.
 
 Normal T3 Code traffic goes directly from Traefik to each configured environment. The gateway only
 manages configuration, credentials, and access.
@@ -59,6 +59,24 @@ set, the admin UI value wins; clearing it falls back to the environment variable
 
 Use an external Traefik instance with `/data/traefik/environments.yml`, or enable the bundled one
 with `T3_GATEWAY_BUNDLED_TRAEFIK_ENABLED=true` and expose ports `80` and `443`.
+
+## MCP relay
+
+Agents connect to `https://<gateway host>/mcp` once and reach every environment they are allowed
+to. Every T3 Code tool gets an `environment` argument naming the environment it runs in, and
+`gateway_list_environments` lists them. The `MCP` page in the admin UI shows setup for common
+agents, the connected agents, and the gateway's own sign-in to each environment.
+
+- Agents that support MCP OAuth sign in with just the URL. An admin approves them in the browser
+  and picks their access level and environments.
+- Other agents use a token created on the `MCP` page, sent as `Authorization: Bearer <token>`.
+
+T3 Code enforces the access level itself: the gateway signs in to each environment once per access
+level in use and relays every call with the matching credential. Environments need a T3 Code build
+with MCP OAuth for outside agents (pingdotgg/t3code#16336).
+
+OAuth URLs come from the request, so the proxy in front of the gateway must pass `Host` (or
+`X-Forwarded-Host`) and `X-Forwarded-Proto`.
 
 ## Development
 
