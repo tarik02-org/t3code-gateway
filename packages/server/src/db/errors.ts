@@ -12,6 +12,7 @@ const DatabaseOperation = Schema.Literals([
   "authUser",
   "environment",
   "settings",
+  "mcpCredential",
 ]);
 
 type DatabaseOperation = typeof DatabaseOperation.Type;

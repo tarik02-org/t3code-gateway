@@ -24,11 +24,6 @@ export const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
     description: "Create terminals and send input to running shells.",
   },
   {
-    scope: "review:write",
-    title: "Write reviews",
-    description: "Create comments while reviewing changes.",
-  },
-  {
     scope: "access:read",
     title: "View access",
     description: "Inspect pairing links and authorized clients.",

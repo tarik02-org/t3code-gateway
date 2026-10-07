@@ -21,6 +21,7 @@ import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { GatewayRuntimeConfig } from "../config.ts";
 import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
 import { DatabaseError } from "../db/errors.ts";
+import { McpUpstreamCredentials } from "../mcp/upstream-credentials.ts";
 import { AdminTokenRotation, adminTokenStatus } from "./admin-token-rotation.ts";
 import {
   decodeStringArrayJson,
@@ -118,6 +119,7 @@ export const make = Effect.gen(function* () {
   const environmentRepository = yield* EnvironmentRepository;
   const secrets = yield* SecretEncryption;
   const adminTokens = yield* AdminTokenRotation;
+  const mcpCredentials = yield* McpUpstreamCredentials;
   const config = yield* GatewayRuntimeConfig;
   const client = yield* HttpClient.HttpClient;
   const validationContext = { environmentRepository, config, client };
@@ -320,6 +322,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
+      yield* mcpCredentials.revokeEnvironment(environmentId);
       yield* environmentRepository.deleteEnvironment(environmentId);
     });
 

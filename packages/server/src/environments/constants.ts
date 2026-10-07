@@ -6,7 +6,6 @@ export const ADMIN_TOKEN_SCOPES = [
   "orchestration:read",
   "orchestration:operate",
   "terminal:operate",
-  "review:write",
   "relay:read",
   "access:read",
   "access:write",

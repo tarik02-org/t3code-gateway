@@ -181,7 +181,6 @@ export const DEFAULT_BROWSER_TOKEN_SCOPES = [
   "orchestration:read",
   "orchestration:operate",
   "terminal:operate",
-  "review:write",
   "relay:read",
 ] as const;
 
@@ -347,3 +346,14 @@ export const RevokeEnvironmentClientResponse = Schema.Struct({
 });
 
 export type RevokeEnvironmentClientResponse = typeof RevokeEnvironmentClientResponse.Type;
+
+/** What a T3 Code MCP client may do, least to most: only read, or act on threads up to the given runtime mode. */
+export const McpAccess = Schema.Literals([
+  "read-only",
+  "approval-required",
+  "auto-accept-edits",
+  "auto",
+  "full-access",
+]);
+
+export type McpAccess = typeof McpAccess.Type;
