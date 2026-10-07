@@ -1,13 +1,18 @@
 import type {
   EnvironmentClientSession,
+  McpAccess,
   RevokeEnvironmentClientResponse,
 } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Encoding from "effect/Encoding";
+import * as Result from "effect/Result";
 import * as HttpBody from "effect/unstable/http/HttpBody";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 import type * as HttpClientError from "effect/unstable/http/HttpClientError";
+import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import * as Schema from "effect/Schema";
 
@@ -490,3 +495,309 @@ export const readEnvironmentLabel = (descriptor: unknown) => {
 
   return descriptor.label;
 };
+
+const MCP_OAUTH_REGISTER_PATH = "/oauth/mcp/register";
+const MCP_OAUTH_DECISION_PATH = "/oauth/mcp/decision";
+const MCP_OAUTH_TOKEN_PATH = "/oauth/mcp/token";
+// The approval decision returns the redirect as data, so nothing ever listens on this loopback URI.
+const MCP_OAUTH_REDIRECT_URI = "http://127.0.0.1:1/callback";
+
+const T3McpRegisteredClient = Schema.Struct({
+  client_id: Schema.String,
+});
+
+const T3McpApprovalRedirect = Schema.Struct({
+  redirectTo: Schema.String,
+});
+
+const T3McpApprovalError = Schema.Struct({
+  message: Schema.String,
+});
+
+const T3McpTokenResult = Schema.Struct({
+  access_token: Schema.String,
+  token_type: Schema.Literal("Bearer"),
+  expires_in: Schema.Number,
+});
+
+const T3McpTokenError = Schema.Struct({
+  error: Schema.String,
+  error_description: Schema.optional(Schema.String),
+});
+
+const T3SessionTokenClaims = Schema.fromJsonString(
+  Schema.Struct({
+    sid: Schema.String,
+  }),
+);
+
+/** Pairing scopes T3 Code requires before it approves an MCP client with the given access. */
+export const mcpClientScopes = (access: McpAccess) =>
+  access === "read-only" ? ["orchestration:read"] : ["orchestration:read", "orchestration:operate"];
+
+const decodeEnvironmentJson = <S extends Schema.Top & { readonly DecodingServices: never }>(
+  schema: S,
+  body: string,
+  message: string,
+) =>
+  readJsonBody(body).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(schema)),
+    Effect.catchTags({
+      SchemaError: () => Effect.fail(new EnvironmentFailure({ message })),
+    }),
+  );
+
+const postEnvironment = (
+  client: HttpClient.HttpClient,
+  url: string,
+  action: string,
+  request: HttpClientRequest.Options.NoUrl,
+) =>
+  client.post(url, request).pipe(
+    Effect.catchTags({
+      HttpClientError: (error) =>
+        Effect.fail(
+          new EnvironmentFailure({
+            message: environmentHttpClientFailureMessage(action, url, error),
+          }),
+        ),
+    }),
+  );
+
+const registerMcpOAuthClient = (
+  client: HttpClient.HttpClient,
+  internalHttpBaseUrl: string,
+  label: string,
+) =>
+  Effect.gen(function* () {
+    const url = joinBaseUrl(internalHttpBaseUrl, MCP_OAUTH_REGISTER_PATH);
+    const response = yield* postEnvironment(client, url, "register MCP client", {
+      headers: { "content-type": "application/json" },
+      body: HttpBody.jsonUnsafe({
+        client_name: label,
+        redirect_uris: [MCP_OAUTH_REDIRECT_URI],
+        token_endpoint_auth_method: "none",
+      }),
+    });
+
+    if (response.status === 404) {
+      return yield* new EnvironmentFailure({
+        message: "This T3 Code version does not support MCP sign-in",
+        status: 404,
+      });
+    }
+    if (response.status !== 201) {
+      return yield* new EnvironmentFailure({
+        message: `MCP client registration failed with status ${response.status}`,
+      });
+    }
+
+    const registered = yield* decodeEnvironmentJson(
+      T3McpRegisteredClient,
+      yield* readResponseText(response),
+      "Environment returned an invalid MCP client registration",
+    );
+    return registered.client_id;
+  });
+
+const createPkcePair = Effect.gen(function* () {
+  const crypto = yield* Crypto.Crypto;
+  const verifier = Encoding.encodeBase64Url(yield* crypto.randomBytes(32));
+  const challenge = yield* crypto.digest("SHA-256", new TextEncoder().encode(verifier));
+  return {
+    verifier,
+    challenge: Encoding.encodeBase64Url(challenge),
+    state: Encoding.encodeBase64Url(yield* crypto.randomBytes(16)),
+  };
+}).pipe(
+  Effect.catchTags({
+    PlatformError: () =>
+      Effect.fail(new EnvironmentFailure({ message: "Could not create a PKCE challenge" })),
+  }),
+);
+
+/** Reads the authorization code from the redirect the approval decision returns. */
+const readAuthorizationCode = (redirectTo: string, state: string) => {
+  const redirect = URL.parse(redirectTo);
+  if (redirect === null) {
+    return Effect.fail(
+      new EnvironmentFailure({ message: "Environment returned an invalid MCP approval redirect" }),
+    );
+  }
+  const error = redirect.searchParams.get("error");
+  if (error !== null) {
+    return Effect.fail(
+      new EnvironmentFailure({
+        message: `Environment refused the MCP approval: ${redirect.searchParams.get("error_description") ?? error}`,
+      }),
+    );
+  }
+  const code = redirect.searchParams.get("code");
+  if (code === null || redirect.searchParams.get("state") !== state) {
+    return Effect.fail(
+      new EnvironmentFailure({ message: "Environment returned an invalid MCP approval redirect" }),
+    );
+  }
+  return Effect.succeed(code);
+};
+
+const approveMcpClient = (
+  client: HttpClient.HttpClient,
+  internalHttpBaseUrl: string,
+  input: {
+    readonly clientId: string;
+    readonly access: McpAccess;
+    readonly pairingCode: string;
+    readonly challenge: string;
+    readonly state: string;
+  },
+) =>
+  Effect.gen(function* () {
+    const url = joinBaseUrl(internalHttpBaseUrl, MCP_OAUTH_DECISION_PATH);
+    const response = yield* postEnvironment(client, url, "approve MCP client", {
+      headers: { "content-type": "application/json" },
+      body: HttpBody.jsonUnsafe({
+        authorization: {
+          response_type: "code",
+          client_id: input.clientId,
+          redirect_uri: MCP_OAUTH_REDIRECT_URI,
+          code_challenge: input.challenge,
+          code_challenge_method: "S256",
+          state: input.state,
+        },
+        decision: { _tag: "pairing-code", access: input.access, code: input.pairingCode },
+      }),
+    });
+    const body = yield* readResponseText(response);
+
+    if (response.status === 400) {
+      const refusal = yield* decodeEnvironmentJson(
+        T3McpApprovalError,
+        body,
+        "Environment refused the MCP approval",
+      );
+      return yield* new EnvironmentFailure({
+        message: `Environment refused the MCP approval: ${refusal.message}`,
+      });
+    }
+    if (response.status !== 200) {
+      return yield* new EnvironmentFailure({
+        message: `MCP approval failed with status ${response.status}`,
+      });
+    }
+
+    const approval = yield* decodeEnvironmentJson(
+      T3McpApprovalRedirect,
+      body,
+      "Environment returned an invalid MCP approval",
+    );
+    return yield* readAuthorizationCode(approval.redirectTo, input.state);
+  });
+
+const exchangeMcpAuthorizationCode = (
+  client: HttpClient.HttpClient,
+  internalHttpBaseUrl: string,
+  input: { readonly clientId: string; readonly code: string; readonly verifier: string },
+) =>
+  Effect.gen(function* () {
+    const url = joinBaseUrl(internalHttpBaseUrl, MCP_OAUTH_TOKEN_PATH);
+    const response = yield* postEnvironment(client, url, "exchange MCP authorization code", {
+      body: HttpBody.text(
+        new URLSearchParams({
+          grant_type: "authorization_code",
+          code: input.code,
+          redirect_uri: MCP_OAUTH_REDIRECT_URI,
+          client_id: input.clientId,
+          code_verifier: input.verifier,
+        }).toString(),
+        "application/x-www-form-urlencoded",
+      ),
+    });
+    const body = yield* readResponseText(response);
+
+    if (response.status === 400) {
+      const refusal = yield* decodeEnvironmentJson(
+        T3McpTokenError,
+        body,
+        "Environment refused the MCP authorization code",
+      );
+      return yield* new EnvironmentFailure({
+        message: `Environment refused the MCP authorization code: ${refusal.error_description ?? refusal.error}`,
+      });
+    }
+    if (response.status !== 200) {
+      return yield* new EnvironmentFailure({
+        message: `MCP token exchange failed with status ${response.status}`,
+      });
+    }
+
+    return yield* decodeEnvironmentJson(
+      T3McpTokenResult,
+      body,
+      "Environment returned an invalid MCP access token",
+    );
+  });
+
+/** T3 Code session tokens are `<base64url JSON claims>.<signature>`; the claims name the session to revoke. */
+const readSessionId = (accessToken: string) => {
+  const unreadable = new EnvironmentFailure({
+    message: "Environment returned an unreadable MCP access token",
+  });
+  const [claims = ""] = accessToken.split(".");
+  const decoded = Encoding.decodeBase64UrlString(claims);
+  if (Result.isFailure(decoded)) {
+    return Effect.fail(unreadable);
+  }
+  return Schema.decodeUnknownEffect(T3SessionTokenClaims)(decoded.success).pipe(
+    Effect.map((session) => session.sid),
+    Effect.mapError(() => unreadable),
+  );
+};
+
+export interface McpClientToken {
+  readonly accessToken: string;
+  readonly sessionId: string;
+  readonly expiresAt: DateTime.Utc;
+}
+
+/**
+ * Signs the gateway in to the environment's MCP server without a browser:
+ * the admin token mints the pairing code that approves the request, and the
+ * approval returns the authorization code as data instead of redirecting.
+ * Every step runs against the internal URL, so the token is bound to no
+ * public host.
+ */
+export const createMcpClientToken = (
+  client: HttpClient.HttpClient,
+  internalHttpBaseUrl: string,
+  adminBearerToken: string,
+  input: { readonly label: string; readonly access: McpAccess },
+) =>
+  Effect.gen(function* () {
+    const clientId = yield* registerMcpOAuthClient(client, internalHttpBaseUrl, input.label);
+    const pairingCode = yield* createPairingCredential(
+      client,
+      internalHttpBaseUrl,
+      adminBearerToken,
+      { label: input.label, scopes: mcpClientScopes(input.access) },
+    );
+    const pkce = yield* createPkcePair;
+    const code = yield* approveMcpClient(client, internalHttpBaseUrl, {
+      clientId,
+      access: input.access,
+      pairingCode,
+      challenge: pkce.challenge,
+      state: pkce.state,
+    });
+    const issuedAt = yield* DateTime.now;
+    const token = yield* exchangeMcpAuthorizationCode(client, internalHttpBaseUrl, {
+      clientId,
+      code,
+      verifier: pkce.verifier,
+    });
+    return {
+      accessToken: token.access_token,
+      sessionId: yield* readSessionId(token.access_token),
+      expiresAt: DateTime.add(issuedAt, { seconds: token.expires_in }),
+    } satisfies McpClientToken;
+  });

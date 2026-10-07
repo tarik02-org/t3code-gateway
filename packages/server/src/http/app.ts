@@ -19,6 +19,7 @@ import { configLayer, GatewayRuntimeConfig } from "../config.ts";
 import { GatewayDatabase, layer as gatewayDatabaseLayer } from "../db/database.ts";
 import { layer as authRepositoryLayer } from "../db/auth-repository.ts";
 import { layer as environmentRepositoryLayer } from "../db/environment-repository.ts";
+import { layer as mcpUpstreamCredentialRepositoryLayer } from "../db/mcp-upstream-credential-repository.ts";
 import { SettingsRepositoryLive } from "../db/settings-repository.ts";
 import {
   AdminTokenRotation,
@@ -26,6 +27,10 @@ import {
 } from "../environments/admin-token-rotation.ts";
 import { ADMIN_TOKEN_SWEEP_INTERVAL } from "../environments/constants.ts";
 import { layer as environmentServiceLayer } from "../environments/service.ts";
+import {
+  layer as mcpUpstreamCredentialsLayer,
+  McpUpstreamCredentials,
+} from "../mcp/upstream-credentials.ts";
 import { layer as adminWebRoutesLayer } from "./admin-web-routes.ts";
 import { layer as authRoutesLayer } from "./auth-routes.ts";
 import { layer as environmentRoutesLayer } from "./environment-routes.ts";
@@ -69,7 +74,17 @@ const adminTokenRotationLiveLayer = AdminTokenRotationLive.pipe(
   Layer.provide(foundationLayer),
 );
 
+const mcpUpstreamCredentialsLiveLayer = mcpUpstreamCredentialsLayer.pipe(
+  Layer.provide(adminTokenRotationLiveLayer),
+  Layer.provide(mcpUpstreamCredentialRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
+  Layer.provide(secretLiveLayer),
+  Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(environmentRepositoryLiveLayer),
+  Layer.provide(foundationLayer),
+);
+
 const environmentLiveLayer = environmentServiceLayer.pipe(
+  Layer.provide(mcpUpstreamCredentialsLiveLayer),
   Layer.provide(adminTokenRotationLiveLayer),
   Layer.provide(secretLiveLayer),
   Layer.provide(NodeHttpClient.layerFetch),
@@ -117,11 +132,17 @@ const bootstrapLayer = Layer.effectDiscard(
       Effect.repeat(Schedule.spaced(ADMIN_TOKEN_SWEEP_INTERVAL)),
       Effect.forkScoped({ startImmediately: true }),
     );
+    const mcpCredentials = yield* McpUpstreamCredentials;
+    yield* mcpCredentials.sweep.pipe(
+      Effect.repeat(Schedule.spaced(ADMIN_TOKEN_SWEEP_INTERVAL)),
+      Effect.forkScoped({ startImmediately: true }),
+    );
   }),
 ).pipe(
   Layer.provide(traefikLiveLayer),
   Layer.provide(authLiveLayer),
   Layer.provide(adminTokenRotationLiveLayer),
+  Layer.provide(mcpUpstreamCredentialsLiveLayer),
 );
 
 const gatewayRpcLayer = RpcServer.layerHttp({

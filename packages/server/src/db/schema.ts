@@ -1,4 +1,5 @@
-import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { blob, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import type { McpAccess } from "@t3code-gateway/contracts/schemas";
 
 export const gatewaySettings = sqliteTable("gateway_settings", {
   key: text("key").primaryKey(),
@@ -40,3 +41,22 @@ export const environments = sqliteTable("environments", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+/** The gateway's own `mcp-client` sign-in to an environment, one per access level a relay grant uses. */
+export const mcpUpstreamCredentials = sqliteTable(
+  "mcp_upstream_credentials",
+  {
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environments.environmentId, { onDelete: "cascade" }),
+    access: text("access").$type<McpAccess>().notNull(),
+    tokenEncrypted: blob("token_encrypted", { mode: "buffer" }),
+    sessionId: text("session_id"),
+    expiresAt: text("expires_at"),
+    lastAttemptAt: text("last_attempt_at"),
+    lastFailure: text("last_failure"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.environmentId, table.access] })],
+);
