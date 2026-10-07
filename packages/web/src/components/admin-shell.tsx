@@ -68,6 +68,7 @@ export function AdminShell({
             [
               { to: "/", label: "Environments" },
               { to: "/connections", label: "Connections" },
+              { to: "/sessions", label: "Sessions" },
             ] as const
           ).map((item) => (
             <Button

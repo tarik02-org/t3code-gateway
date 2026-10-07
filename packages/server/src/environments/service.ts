@@ -397,10 +397,15 @@ export const make = Effect.gen(function* () {
       }
 
       const sessions = yield* listClientSessions(client, row.endpoint, adminBearerToken);
+      const relaySessions = yield* mcpCredentials.sessionIds(environmentId);
 
       return sessions.map((session) =>
         Object.assign({}, session, {
-          gatewayRole: session.current ? ("admin" as const) : undefined,
+          gatewayRole: session.current
+            ? ("admin" as const)
+            : relaySessions.has(session.sessionId)
+              ? ("mcp-relay" as const)
+              : undefined,
         }),
       );
     });

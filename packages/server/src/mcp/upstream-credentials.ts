@@ -52,6 +52,10 @@ export class McpUpstreamCredentials extends Context.Service<
       token: string,
     ) => Effect.Effect<void, DatabaseError>;
     readonly listStatus: Effect.Effect<ReadonlyArray<McpUpstreamCredentialStatus>, DatabaseError>;
+    /** The T3 Code session ids of the gateway's MCP sign-ins to an environment. */
+    readonly sessionIds: (
+      environmentId: string,
+    ) => Effect.Effect<ReadonlySet<string>, DatabaseError>;
     /** Rotates every stored credential that is due. */
     readonly sweep: Effect.Effect<void>;
     /**
@@ -336,7 +340,18 @@ export const make = Effect.gen(function* () {
       ),
     );
 
+  const sessionIds = (environmentId: string) =>
+    credentialRepository
+      .listEnvironmentCredentials(environmentId)
+      .pipe(
+        Effect.map(
+          (rows): ReadonlySet<string> =>
+            new Set(rows.flatMap((row) => (row.sessionId === null ? [] : [row.sessionId]))),
+        ),
+      );
+
   return McpUpstreamCredentials.of({
+    sessionIds,
     ensure,
     invalidate,
     listStatus,
