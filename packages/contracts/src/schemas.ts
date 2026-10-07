@@ -410,3 +410,49 @@ export type McpUpstreamCredentialStatus = typeof McpUpstreamCredentialStatus.Typ
 export class McpFailure extends Schema.TaggedErrorClass<McpFailure>()("McpFailure", {
   message: Schema.String,
 }) {}
+
+/** An OAuth authorization request as the consent page received it; the gateway checks every field. */
+export const McpAuthorizationRequest = Schema.Struct({
+  response_type: Schema.optionalKey(Schema.String),
+  client_id: Schema.optionalKey(Schema.String),
+  redirect_uri: Schema.optionalKey(Schema.String),
+  code_challenge: Schema.optionalKey(Schema.String),
+  code_challenge_method: Schema.optionalKey(Schema.String),
+  state: Schema.optionalKey(Schema.String),
+  resource: Schema.optionalKey(Schema.String),
+  scope: Schema.optionalKey(Schema.String),
+});
+
+export type McpAuthorizationRequest = typeof McpAuthorizationRequest.Type;
+
+export const McpAuthorizationDetails = Schema.Union([
+  /** A valid request the signed-in user may approve. */
+  Schema.TaggedStruct("Pending", {
+    /** Self-declared by the client. */
+    clientName: Schema.String,
+    redirectUri: Schema.String,
+  }),
+  /** A protocol error the client must receive through its redirect. */
+  Schema.TaggedStruct("Redirect", {
+    redirectTo: Schema.String,
+  }),
+]);
+
+export type McpAuthorizationDetails = typeof McpAuthorizationDetails.Type;
+
+export const McpAuthorizationDecision = Schema.Union([
+  Schema.TaggedStruct("Approve", {
+    label: Schema.String,
+    access: McpAccess,
+    environmentIds: Schema.NullOr(Schema.Array(Schema.String)),
+  }),
+  Schema.TaggedStruct("Deny", {}),
+]);
+
+export type McpAuthorizationDecision = typeof McpAuthorizationDecision.Type;
+
+export const McpAuthorizationRedirect = Schema.Struct({
+  redirectTo: Schema.String,
+});
+
+export type McpAuthorizationRedirect = typeof McpAuthorizationRedirect.Type;

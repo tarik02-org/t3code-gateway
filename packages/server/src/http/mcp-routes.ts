@@ -29,7 +29,7 @@ export const layer = Layer.effectDiscard(
 
     const handler = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const origin = requestOrigin(request);
+      const origin = requestOrigin(request.headers);
 
       // Agents call from processes, not pages: a page on another origin must not drive the relay.
       const callerOrigin = request.headers["origin"];
@@ -41,10 +41,9 @@ export const layer = Layer.effectDiscard(
       const caller = bearerToken === null ? null : yield* grants.authenticate(bearerToken);
       if (caller === null) {
         return jsonRpcError(401, "A valid T3 Code Gateway MCP credential is required", {
-          "www-authenticate":
-            bearerToken === null
-              ? 'Bearer realm="t3code-gateway"'
-              : 'Bearer realm="t3code-gateway", error="invalid_token"',
+          "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"${
+            bearerToken === null ? "" : ', error="invalid_token"'
+          }`,
         });
       }
 

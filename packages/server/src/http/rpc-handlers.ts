@@ -2,6 +2,7 @@ import { GatewayRequestContext } from "@t3code-gateway/contracts/gateway-session
 import {
   CreateEnvironmentPairingLinkPayload,
   CreateT3CodeCatalogEntryPayload,
+  DecideMcpAuthorizationPayload,
   EnvironmentIdPayload,
   GatewayRpcs,
   McpGrantIdPayload,
@@ -15,6 +16,7 @@ import {
   EnvironmentFailure,
   CreateMcpTokenRequest,
   EnvironmentInput,
+  McpAuthorizationRequest,
   McpFailure,
 } from "@t3code-gateway/contracts/schemas";
 import * as Effect from "effect/Effect";
@@ -24,6 +26,7 @@ import { AuthService } from "../auth/service.ts";
 import type { DatabaseError } from "../db/errors.ts";
 import { EnvironmentService } from "../environments/service.ts";
 import { McpGrants } from "../mcp/grants.ts";
+import { McpOAuth, type McpOAuthPageError, mcpOAuthUrls, redirectForError } from "../mcp/oauth.ts";
 import { McpUpstreamCredentials } from "../mcp/upstream-credentials.ts";
 import { T3CodeWebService } from "../t3code-web/service.ts";
 import { TraefikReconciler } from "../traefik/reconciler.ts";
@@ -49,6 +52,10 @@ const mcpRpcErrors = {
   ...mcpRpcDatabaseErrors,
 };
 
+/** A request naming an unknown client or redirect: the consent page shows it. */
+const oauthPageFailure = (error: McpOAuthPageError) =>
+  Effect.fail(new McpFailure({ message: error.description }));
+
 export const layer = GatewayRpcs.toLayer(
   Effect.gen(function* () {
     const auth = yield* AuthService;
@@ -57,6 +64,7 @@ export const layer = GatewayRpcs.toLayer(
     const t3codeWeb = yield* T3CodeWebService;
     const mcpGrants = yield* McpGrants;
     const mcpCredentials = yield* McpUpstreamCredentials;
+    const mcpOAuth = yield* McpOAuth;
 
     return GatewayRpcs.of({
       "gateway.auth.me": () =>
@@ -192,6 +200,55 @@ export const layer = GatewayRpcs.toLayer(
 
       "gateway.mcp.grants.revoke": (payload: McpGrantIdPayload) =>
         mcpGrants.revoke(payload.grantId).pipe(Effect.catchTags(mcpRpcErrors)),
+
+      "gateway.mcp.oauth.describe": (payload: McpAuthorizationRequest) =>
+        Effect.gen(function* () {
+          const urls = mcpOAuthUrls((yield* GatewayRequestContext).origin);
+          return yield* mcpOAuth.validateAuthorization(urls, payload).pipe(
+            Effect.map(
+              (authorization) =>
+                ({
+                  _tag: "Pending",
+                  clientName: authorization.client.name,
+                  redirectUri: authorization.redirectUri,
+                }) as const,
+            ),
+            Effect.catchTags({
+              McpOAuthPageError: oauthPageFailure,
+              McpOAuthRedirectError: (error) =>
+                Effect.succeed({
+                  _tag: "Redirect",
+                  redirectTo: redirectForError(error, urls),
+                } as const),
+            }),
+          );
+        }),
+
+      "gateway.mcp.oauth.decide": (payload: DecideMcpAuthorizationPayload) =>
+        Effect.gen(function* () {
+          const { origin, sessionToken } = yield* GatewayRequestContext;
+          const urls = mcpOAuthUrls(origin);
+          const validated = yield* mcpOAuth.validateAuthorization(urls, payload.authorization).pipe(
+            Effect.map((authorization) => ({ authorization })),
+            Effect.catchTags({
+              McpOAuthPageError: oauthPageFailure,
+              McpOAuthRedirectError: (error) =>
+                Effect.succeed({ redirectTo: redirectForError(error, urls) }),
+            }),
+          );
+          if ("redirectTo" in validated) {
+            return validated;
+          }
+          const { authorization } = validated;
+          const user = yield* auth.currentUser(sessionToken);
+          const redirectTo = yield* mcpOAuth.decide({
+            urls,
+            authorization,
+            decision: payload.decision,
+            userId: user?.id ?? null,
+          });
+          return { redirectTo };
+        }).pipe(Effect.catchTags(mcpRpcErrors)),
 
       "gateway.mcp.upstream.list": () =>
         mcpCredentials.listStatus.pipe(Effect.catchTags(mcpRpcDatabaseErrors)),

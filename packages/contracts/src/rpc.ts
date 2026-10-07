@@ -8,6 +8,10 @@ import {
   CheckT3CodeWebUpdatesRequest,
   CreatedMcpToken,
   CreateMcpTokenRequest,
+  McpAuthorizationDecision,
+  McpAuthorizationDetails,
+  McpAuthorizationRedirect,
+  McpAuthorizationRequest,
   McpFailure,
   McpGrant,
   McpUpstreamCredentialStatus,
@@ -228,6 +232,25 @@ export class ListMcpUpstreamCredentials extends Rpc.make("gateway.mcp.upstream.l
   error: McpFailure,
 }).middleware(GatewaySessionMiddleware) {}
 
+export class DescribeMcpAuthorization extends Rpc.make("gateway.mcp.oauth.describe", {
+  payload: McpAuthorizationRequest,
+  success: McpAuthorizationDetails,
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
+export const DecideMcpAuthorizationPayload = Schema.Struct({
+  authorization: McpAuthorizationRequest,
+  decision: McpAuthorizationDecision,
+});
+
+export type DecideMcpAuthorizationPayload = typeof DecideMcpAuthorizationPayload.Type;
+
+export class DecideMcpAuthorization extends Rpc.make("gateway.mcp.oauth.decide", {
+  payload: DecideMcpAuthorizationPayload,
+  success: McpAuthorizationRedirect,
+  error: McpFailure,
+}).middleware(GatewaySessionMiddleware) {}
+
 export class GatewayRpcs extends RpcGroup.make(
   GetCurrentUser,
   ChangePassword,
@@ -248,6 +271,8 @@ export class GatewayRpcs extends RpcGroup.make(
   CreateMcpToken,
   RevokeMcpGrant,
   ListMcpUpstreamCredentials,
+  DescribeMcpAuthorization,
+  DecideMcpAuthorization,
   UpdateT3CodeWebSettings,
   CheckT3CodeWebUpdates,
   ListT3CodeWebReleases,

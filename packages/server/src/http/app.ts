@@ -23,6 +23,8 @@ import { layer as mcpUpstreamCredentialRepositoryLayer } from "../db/mcp-upstrea
 import { layer as mcpGrantRepositoryLayer } from "../db/mcp-grant-repository.ts";
 import { layer as mcpGrantsLayer } from "../mcp/grants.ts";
 import { layer as mcpRelayLayer } from "../mcp/relay.ts";
+import { layer as mcpOAuthLayer } from "../mcp/oauth.ts";
+import { layer as mcpOAuthRoutesLayer } from "./mcp-oauth-routes.ts";
 import { layer as mcpRoutesLayer } from "./mcp-routes.ts";
 import { SettingsRepositoryLive } from "../db/settings-repository.ts";
 import {
@@ -90,6 +92,13 @@ const mcpUpstreamCredentialsLiveLayer = mcpUpstreamCredentialsLayer.pipe(
 const mcpGrantsLiveLayer = mcpGrantsLayer.pipe(
   Layer.provide(mcpGrantRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
   Layer.provide(environmentRepositoryLiveLayer),
+  Layer.provide(foundationLayer),
+);
+
+const mcpOAuthLiveLayer = mcpOAuthLayer.pipe(
+  Layer.provide(mcpGrantsLiveLayer),
+  Layer.provide(mcpGrantRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
+  Layer.provide(secretLiveLayer),
   Layer.provide(foundationLayer),
 );
 
@@ -174,7 +183,9 @@ const routesLayer = Layer.mergeAll(
   t3codeWebRoutesLayer,
   traefikRoutesLayer,
   mcpRoutesLayer,
+  mcpOAuthRoutesLayer,
 ).pipe(
+  Layer.provideMerge(mcpOAuthLiveLayer),
   Layer.provideMerge(mcpRelayLiveLayer),
   Layer.provideMerge(mcpGrantsLiveLayer),
   Layer.provideMerge(mcpUpstreamCredentialsLiveLayer),

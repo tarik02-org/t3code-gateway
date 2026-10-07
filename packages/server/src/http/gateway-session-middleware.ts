@@ -9,6 +9,7 @@ import * as Cookies from "effect/unstable/http/Cookies";
 import * as Headers from "effect/unstable/http/Headers";
 
 import { SESSION_COOKIE_NAME } from "../auth/constants.ts";
+import { requestOrigin } from "./request-origin.ts";
 
 const readSessionToken = (cookies: Readonly<Record<string, string>>) =>
   cookies[SESSION_COOKIE_NAME];
@@ -26,6 +27,7 @@ const requestContextFromHeaders = (headers: Headers.Headers) => {
   return {
     sessionToken: readSessionToken(cookies),
     secure: isSecureFromHeaders(headers),
+    origin: requestOrigin(headers),
   };
 };
 

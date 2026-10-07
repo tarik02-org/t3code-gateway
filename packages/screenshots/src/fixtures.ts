@@ -246,6 +246,7 @@ const screenshotSessionMiddleware = Layer.succeed(GatewaySessionMiddleware, (eff
   Effect.provideService(effect, GatewayRequestContext, {
     sessionToken: undefined,
     secure: false,
+    origin: "https://gateway.example.com",
   }),
 );
 

@@ -1,9 +1,8 @@
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import type * as Headers from "effect/unstable/http/Headers";
 
 /** The origin the client reached, as the reverse proxy in front of the gateway reports it. */
-export const requestOrigin = (request: HttpServerRequest.HttpServerRequest) => {
-  const proto = request.headers["x-forwarded-proto"]?.split(",")[0]?.trim() ?? "http";
-  const host =
-    request.headers["x-forwarded-host"]?.split(",")[0]?.trim() ?? request.headers["host"];
+export const requestOrigin = (headers: Headers.Headers) => {
+  const proto = headers["x-forwarded-proto"]?.split(",")[0]?.trim() ?? "http";
+  const host = headers["x-forwarded-host"]?.split(",")[0]?.trim() ?? headers["host"];
   return `${proto}://${host ?? "localhost"}`;
 };

@@ -1,7 +1,9 @@
 import type {
   ChangePasswordRequest,
   CheckT3CodeWebUpdatesRequest,
+  CreatedMcpToken,
   CreateEnvironmentPairingLinkRequest,
+  CreateMcpTokenRequest,
   CurrentUser,
   EnvironmentClientSession,
   EnvironmentInput,
@@ -11,6 +13,12 @@ import type {
   InstallT3CodeWebReleaseRequest,
   LoginRequest,
   LoginResponse,
+  McpAuthorizationDecision,
+  McpAuthorizationDetails,
+  McpAuthorizationRedirect,
+  McpAuthorizationRequest,
+  McpGrant,
+  McpUpstreamCredentialStatus,
   RevokeEnvironmentClientResponse,
   T3CodeCatalogEntryRequest,
   T3CodeCatalogEntryResponse,
@@ -193,4 +201,35 @@ export async function revokeEnvironmentClient(
   return runGatewayRpc((client) =>
     client["gateway.environments.clients.revoke"]({ environmentId, sessionId }),
   );
+}
+
+export async function listMcpGrants(): Promise<ReadonlyArray<McpGrant>> {
+  return runGatewayRpc((client) => client["gateway.mcp.grants.list"](undefined));
+}
+
+export async function createMcpToken(payload: CreateMcpTokenRequest): Promise<CreatedMcpToken> {
+  return runGatewayRpc((client) => client["gateway.mcp.tokens.create"](payload));
+}
+
+export async function revokeMcpGrant(grantId: string): Promise<void> {
+  await runGatewayRpc((client) => client["gateway.mcp.grants.revoke"]({ grantId }));
+}
+
+export async function listMcpUpstreamCredentials(): Promise<
+  ReadonlyArray<McpUpstreamCredentialStatus>
+> {
+  return runGatewayRpc((client) => client["gateway.mcp.upstream.list"](undefined));
+}
+
+export async function describeMcpAuthorization(
+  payload: McpAuthorizationRequest,
+): Promise<McpAuthorizationDetails> {
+  return runGatewayRpc((client) => client["gateway.mcp.oauth.describe"](payload));
+}
+
+export async function decideMcpAuthorization(
+  authorization: McpAuthorizationRequest,
+  decision: McpAuthorizationDecision,
+): Promise<McpAuthorizationRedirect> {
+  return runGatewayRpc((client) => client["gateway.mcp.oauth.decide"]({ authorization, decision }));
 }
