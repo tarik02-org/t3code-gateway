@@ -1,5 +1,37 @@
 # @t3code-gateway/web
 
+## 0.4.0
+
+### Minor Changes
+
+- 4acb9cf: Add an MCP page to the admin UI listing connected agents (OAuth and tokens) with revoke. A
+  `Connect agent` dialog shows the gateway's MCP URL with generic setup (endpoint, OAuth metadata,
+  header) and setup for Claude Code, Codex, Cursor, VS Code, OpenCode, Gemini CLI and the Claude app,
+  for OAuth or a token. A `Create token` dialog creates tokens. The environments table gets an `MCP`
+  column with the gateway's own sign-in to each environment.
+
+  The `MCP` badge opens the gateway's sign-ins for that environment with a `Sign out` button, which
+  revokes them in T3 Code; the next agent call signs in again.
+
+- ed2f55e: Let MCP clients sign in to the gateway with OAuth. The gateway publishes OAuth discovery metadata,
+  registers clients dynamically (stateless, sealed client ids), and sends the browser to a new consent
+  page where a signed-in admin picks the access level and environments. Clients get one-hour access
+  tokens and rotating 90-day refresh tokens. Login now returns to the admin page it interrupted.
+
+### Patch Changes
+
+- d3da415: Stop asking T3 Code for the `review:write` scope, which it never grants to pairing credentials. Admin
+  token rotation no longer fails its scope check on current T3 Code builds, and stored browser token
+  scopes drop it so catalog tokens can be minted again.
+- 3624f56: Keep T3 Code's own settings when adding or removing an environment from the gateway. The gateway
+  rewrote the saved connection catalog with only the keys it knew, so every add or remove switched
+  disabled environments back on and dropped GitHub routing permissions.
+- Updated dependencies [b8c711f]
+- Updated dependencies [ed2f55e]
+- Updated dependencies [d3da415]
+- Updated dependencies [d3da415]
+  - @t3code-gateway/contracts@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes

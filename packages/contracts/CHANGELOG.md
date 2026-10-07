@@ -1,5 +1,29 @@
 # @t3code-gateway/contracts
 
+## 0.4.0
+
+### Minor Changes
+
+- b8c711f: Relay T3 Code's MCP tools through the gateway's own `/mcp`. Clients authenticate with gateway
+  tokens (`t3gw_…`) that name an access level and the environments they reach. Every tool gets an
+  `environment` argument, `gateway_list_environments` lists the reachable ones, and tools that only
+  work inside a T3 thread are hidden. New RPCs create, list and revoke tokens and show the gateway's
+  sign-in to each environment.
+- ed2f55e: Let MCP clients sign in to the gateway with OAuth. The gateway publishes OAuth discovery metadata,
+  registers clients dynamically (stateless, sealed client ids), and sends the browser to a new consent
+  page where a signed-in admin picks the access level and environments. Clients get one-hour access
+  tokens and rotating 90-day refresh tokens. Login now returns to the admin page it interrupted.
+- d3da415: Sign the gateway in to each environment's MCP server for the upcoming MCP relay. The gateway gets
+  `mcp-client` tokens through T3 Code's MCP OAuth with its admin token, without a browser, stores
+  them encrypted per access level, rotates them a week before they expire, and revokes them when an
+  environment is removed.
+
+### Patch Changes
+
+- d3da415: Stop asking T3 Code for the `review:write` scope, which it never grants to pairing credentials. Admin
+  token rotation no longer fails its scope check on current T3 Code builds, and stored browser token
+  scopes drop it so catalog tokens can be minted again.
+
 ## 0.3.1
 
 ## 0.3.0
