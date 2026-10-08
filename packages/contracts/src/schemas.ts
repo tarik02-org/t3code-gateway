@@ -177,10 +177,20 @@ export const T3CodeCatalogEntryResponse = Schema.Struct({
 
 export type T3CodeCatalogEntryResponse = typeof T3CodeCatalogEntryResponse.Type;
 
+/** T3 Code's standard client grant; T3 Code never infers these from broader scopes. */
 export const DEFAULT_BROWSER_TOKEN_SCOPES = [
   "orchestration:read",
   "orchestration:operate",
+  "settings:write",
+  "providers:manage",
+  "environment:maintain",
+  "preview:operate",
+  "diagnostics:read",
+  "terminal:read",
   "terminal:operate",
+  "source-control:write",
+  "filesystem:read",
+  "filesystem:write",
   "relay:read",
 ] as const;
 

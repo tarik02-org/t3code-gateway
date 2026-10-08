@@ -11,17 +11,62 @@ export const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
   {
     scope: AUTH_ORCHESTRATION_READ_SCOPE,
     title: "View environment",
-    description: "Read threads, status, diffs, and configuration.",
+    description: "Read threads, status, checkpoints, and configuration.",
   },
   {
     scope: "orchestration:operate",
     title: "Operate tasks",
-    description: "Start tasks and perform changes in the environment.",
+    description: "Start, update, and stop tasks.",
+  },
+  {
+    scope: "settings:write",
+    title: "Change environment settings",
+    description: "Edit environment preferences and keybindings.",
+  },
+  {
+    scope: "providers:manage",
+    title: "Manage providers",
+    description: "Configure, install, sign in to, and update providers and usage sources.",
+  },
+  {
+    scope: "environment:maintain",
+    title: "Maintain environment",
+    description: "Update the server and control environment processes.",
+  },
+  {
+    scope: "preview:operate",
+    title: "Control previews",
+    description: "Open browser previews and host browser automation.",
+  },
+  {
+    scope: "diagnostics:read",
+    title: "View diagnostics and usage",
+    description: "Read process diagnostics, resource history, and usage totals.",
+  },
+  {
+    scope: "terminal:read",
+    title: "View terminals",
+    description: "Read existing terminal output and status.",
   },
   {
     scope: "terminal:operate",
     title: "Use terminals",
     description: "Create terminals and send input to running shells.",
+  },
+  {
+    scope: "source-control:write",
+    title: "Change source control",
+    description: "Commit, push, manage branches and repositories, and change pull requests.",
+  },
+  {
+    scope: "filesystem:read",
+    title: "Read files",
+    description: "Browse host files, search workspaces, and inspect local changes.",
+  },
+  {
+    scope: "filesystem:write",
+    title: "Write files",
+    description: "Edit workspace files and save plans to disk.",
   },
   {
     scope: "access:read",

@@ -2,11 +2,9 @@ import { DEFAULT_BROWSER_TOKEN_SCOPES } from "@t3code-gateway/contracts/schemas"
 
 export const DEFAULT_ENVIRONMENT_BROWSER_TOKEN_SCOPES = [...DEFAULT_BROWSER_TOKEN_SCOPES];
 
+// An admin token can only issue scopes it holds, so it carries every scope the gateway hands out.
 export const ADMIN_TOKEN_SCOPES = [
-  "orchestration:read",
-  "orchestration:operate",
-  "terminal:operate",
-  "relay:read",
+  ...DEFAULT_BROWSER_TOKEN_SCOPES,
   "access:read",
   "access:write",
   "relay:write",

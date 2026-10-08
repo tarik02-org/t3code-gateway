@@ -14,6 +14,7 @@ import type {
   EnvironmentRecord,
   GatewayStatus,
 } from "@t3code-gateway/contracts/schemas";
+import { DEFAULT_BROWSER_TOKEN_SCOPES } from "@t3code-gateway/contracts/schemas";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
@@ -47,7 +48,7 @@ const gatewayStatus = {
       },
       {
         channel: "nightly",
-        version: "2026.8.2901-nightly.20260907.483",
+        version: "2026.9.701-nightly.20261008.553",
         source: "bundled",
         active: true,
         pinned: true,
@@ -57,12 +58,7 @@ const gatewayStatus = {
   },
 } satisfies GatewayStatus;
 
-const browserTokenScopes = [
-  "orchestration:read",
-  "orchestration:operate",
-  "terminal:operate",
-  "relay:read",
-];
+const browserTokenScopes = [...DEFAULT_BROWSER_TOKEN_SCOPES];
 
 const environmentEntries: ReadonlyArray<readonly [slug: string, label: string]> = [
   ["workstation", "Workstation"],
@@ -93,12 +89,9 @@ const environments = environmentEntries.map(([slug, label]) => ({
 })) satisfies ReadonlyArray<EnvironmentRecord>;
 
 const clientScopes = [
-  "orchestration:read",
-  "orchestration:operate",
-  "terminal:operate",
+  ...DEFAULT_BROWSER_TOKEN_SCOPES,
   "access:read",
   "access:write",
-  "relay:read",
   "relay:write",
 ];
 

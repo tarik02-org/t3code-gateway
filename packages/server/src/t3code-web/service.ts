@@ -347,10 +347,13 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
               Effect.fail(storageFailure("GitHub returned an invalid T3 Code release response")),
             ),
           );
+    // Other prereleases (canary, preview) are built for other hosts and break when served here.
     const matching = releases.filter(
       (release) =>
         !release.draft &&
-        (channel === "nightly" ? release.prerelease : release.prerelease === false),
+        (channel === "nightly"
+          ? release.prerelease && release.tag_name.includes("-nightly.")
+          : release.prerelease === false),
     );
     if (matching.length === 0) {
       return yield* storageFailure(`GitHub has no ${channel} T3 Code release`);
@@ -367,7 +370,8 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
         result.push({ version, url: asset.browser_download_url });
       }
     }
-    return result;
+    // Newest by version, the order activation uses, so the latest download is the one served.
+    return result.toSorted((left, right) => versionCollator.compare(right.version, left.version));
   });
 
   const fetchLatestRelease = Effect.fn("T3CodeWebService.fetchLatestRelease")(function* (
