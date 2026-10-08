@@ -23,6 +23,10 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+import * as HttpBody from "effect/unstable/http/HttpBody";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
 import { joinBaseUrl } from "../environments/urls.ts";
@@ -45,12 +49,74 @@ const callerThreadTools = new Set([
   "create_threads",
   "delegate_task",
   "request_secret",
+  "t3_identity",
   "task_cancel",
   "task_status",
   "t3_worktree_handoff",
   "t3_worktree_status",
 ]);
 const callerThreadToolPrefixes = ["device_", "html_", "preview_", "t3_preview_"];
+
+const ATTACHMENT_UPLOAD_TOOL = "t3_attachment_prepare_upload";
+const UPSTREAM_ATTACHMENT_UPLOAD_PREFIX = "/api/attachments/upload/";
+// A signed upload token is `<base64url claims>.<base64url signature>`; nothing else reaches the environment.
+const UPLOAD_TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+/** Where a relay client posts an upload: the gateway, which passes it to the environment that signed it. */
+export const RELAY_ATTACHMENT_UPLOAD_ROUTE = "/mcp/environments/:slug/attachments/upload/:token";
+
+const relayAttachmentUploadPath = (slug: string, token: string) =>
+  `/mcp/environments/${encodeURIComponent(slug)}/attachments/upload/${token}`;
+
+const UploadUrlResult = Schema.StructWithRest(Schema.Struct({ relativeUrl: Schema.String }), [
+  Schema.Record(Schema.String, Schema.Unknown),
+]);
+const decodeUploadUrlResult = Schema.decodeUnknownOption(UploadUrlResult);
+const decodeUploadUrlResultJson = Schema.decodeUnknownOption(
+  Schema.fromJsonString(UploadUrlResult),
+);
+
+/**
+ * T3 Code tells the agent to post the upload to `relativeUrl` on the MCP
+ * server's origin, which for a relay client is the gateway. Points it at the
+ * gateway's upload route for the environment.
+ */
+const withRelayedUploadUrl = (slug: string, result: CallToolResult): CallToolResult => {
+  const rewrite = (value: typeof UploadUrlResult.Type) => {
+    if (!value.relativeUrl.startsWith(UPSTREAM_ATTACHMENT_UPLOAD_PREFIX)) {
+      return value;
+    }
+    const token = value.relativeUrl.slice(UPSTREAM_ATTACHMENT_UPLOAD_PREFIX.length);
+    return UPLOAD_TOKEN_PATTERN.test(token)
+      ? { ...value, relativeUrl: relayAttachmentUploadPath(slug, token) }
+      : value;
+  };
+  const structuredContent = Option.match(decodeUploadUrlResult(result.structuredContent), {
+    onNone: () => result.structuredContent,
+    onSome: rewrite,
+  });
+  return {
+    ...result,
+    ...(structuredContent === undefined ? {} : { structuredContent }),
+    content: result.content.map((block) =>
+      block.type !== "text"
+        ? block
+        : Option.match(decodeUploadUrlResultJson(block.text), {
+            onNone: () => block,
+            onSome: (value) => ({ ...block, text: JSON.stringify(rewrite(value)) }),
+          }),
+    ),
+  };
+};
+
+/** An attachment upload's body, streamed through to the environment unread. */
+export interface AttachmentUpload {
+  readonly body: Stream.Stream<Uint8Array, unknown>;
+  readonly contentType: string | undefined;
+  readonly contentLength: number | undefined;
+}
+
+const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 
 const isRelayedTool = (name: string) =>
   !callerThreadTools.has(name) &&
@@ -158,12 +224,22 @@ export class McpRelay extends Context.Service<
       request: Request,
       caller: McpCaller,
     ) => Effect.Effect<Response, McpRelayError>;
+    /**
+     * Passes an attachment upload to the environment that signed its token.
+     * The signed token is the upload's only credential, as it is in T3 Code.
+     */
+    readonly uploadAttachment: (
+      slug: string,
+      token: string,
+      upload: AttachmentUpload,
+    ) => Effect.Effect<HttpServerResponse.HttpServerResponse, McpRelayError>;
   }
 >()("@t3code-gateway/server/mcp/relay/McpRelay") {}
 
 export const make = Effect.gen(function* () {
   const environments = yield* EnvironmentRepository;
   const credentials = yield* McpUpstreamCredentials;
+  const httpClient = yield* HttpClient.HttpClient;
   const upstreamClients = new Map<string, PooledClient>();
   const toolCache = new Map<string, CachedTools>();
   const context = yield* Effect.context<never>();
@@ -422,6 +498,11 @@ export const make = Effect.gen(function* () {
             resetTimeoutOnProgress: true,
           }) as Promise<CallToolResult>,
       ).pipe(
+        Effect.map((result) =>
+          name === ATTACHMENT_UPLOAD_TOOL && result.isError !== true
+            ? withRelayedUploadUrl(environment.slug, result)
+            : result,
+        ),
         Effect.catch((cause) =>
           cause instanceof RelayRpcError
             ? Effect.fail(cause)
@@ -483,6 +564,42 @@ export const make = Effect.gen(function* () {
       catch: (cause) => relayError(cause, "MCP request failed"),
     });
 
+  const uploadAttachment = (slug: string, token: string, upload: AttachmentUpload) =>
+    Effect.gen(function* () {
+      if (!UPLOAD_TOKEN_PATTERN.test(token)) {
+        return notFound;
+      }
+      const rows = yield* environments.listEnvironments.pipe(
+        Effect.mapError(
+          (error) =>
+            new McpRelayError({ message: `Could not load environments: ${error.message}` }),
+        ),
+      );
+      const environment = rows.find((row) => row.slug === slug && row.enabled && row.mcpEnabled);
+      if (environment === undefined) {
+        return notFound;
+      }
+      const response = yield* httpClient
+        .post(joinBaseUrl(environment.endpoint, `${UPSTREAM_ATTACHMENT_UPLOAD_PREFIX}${token}`), {
+          body: HttpBody.stream(upload.body, upload.contentType, upload.contentLength),
+        })
+        .pipe(
+          Effect.mapError(
+            () => new McpRelayError({ message: "The environment did not accept the upload" }),
+          ),
+        );
+      // T3 Code answers 204 or a short text explaining the refusal.
+      if (response.status === 204) {
+        return HttpServerResponse.empty({ status: 204 });
+      }
+      const detail = yield* response.text.pipe(
+        Effect.mapError(
+          () => new McpRelayError({ message: "The environment did not answer the upload" }),
+        ),
+      );
+      return HttpServerResponse.text(detail, { status: response.status });
+    });
+
   yield* Effect.addFinalizer(() =>
     Effect.promise(() =>
       Promise.allSettled(
@@ -493,7 +610,7 @@ export const make = Effect.gen(function* () {
     ),
   );
 
-  return McpRelay.of({ handle });
+  return McpRelay.of({ handle, uploadAttachment });
 });
 
 export const layer = Layer.effect(McpRelay, make);

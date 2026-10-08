@@ -104,6 +104,7 @@ const mcpOAuthLiveLayer = mcpOAuthLayer.pipe(
 
 const mcpRelayLiveLayer = mcpRelayLayer.pipe(
   Layer.provide(mcpUpstreamCredentialsLiveLayer),
+  Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(environmentRepositoryLiveLayer),
 );
 

@@ -35,7 +35,9 @@ const EnvironmentClientMetadataDeviceType = Schema.Literals([
 const T3ClientSession = Schema.Struct({
   sessionId: Schema.String,
   subject: Schema.String,
+  // `scopes` lists only the scopes older clients know; `permissions` is the whole grant.
   scopes: Schema.Array(Schema.String),
+  permissions: Schema.optional(Schema.Array(Schema.String)),
   method: Schema.Literals(["browser-session-cookie", "bearer-access-token", "dpop-access-token"]),
   client: Schema.Struct({
     label: Schema.optional(Schema.String),
@@ -342,7 +344,7 @@ const bearerAuthHeaders = (adminBearerToken: string) => ({
 const mapClientSession = (session: typeof T3ClientSession.Type): EnvironmentClientSession => ({
   sessionId: session.sessionId,
   subject: session.subject,
-  scopes: session.scopes,
+  scopes: session.permissions ?? session.scopes,
   method: session.method,
   client: session.client,
   issuedAt: session.issuedAt,

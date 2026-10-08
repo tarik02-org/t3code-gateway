@@ -6,7 +6,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
 import { GatewayRuntimeConfig } from "../config.ts";
 import { McpGrants } from "../mcp/grants.ts";
-import { McpRelay, McpRelayError } from "../mcp/relay.ts";
+import { McpRelay, McpRelayError, RELAY_ATTACHMENT_UPLOAD_ROUTE } from "../mcp/relay.ts";
 import { requestOrigin } from "./request-origin.ts";
 
 export const MCP_PATH = "/mcp";
@@ -67,5 +67,29 @@ export const layer = Layer.effectDiscard(
     );
 
     yield* router.add("*", MCP_PATH, handler);
+
+    yield* router.add("POST", RELAY_ATTACHMENT_UPLOAD_ROUTE, () =>
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const callerOrigin = request.headers["origin"];
+        if (
+          callerOrigin !== undefined &&
+          callerOrigin !== requestOrigin(request.headers, config.publicUrl)
+        ) {
+          return HttpServerResponse.text("Cross-origin requests are not allowed", { status: 403 });
+        }
+        const params = yield* HttpRouter.params;
+        const contentLength = request.headers["content-length"];
+        return yield* relay.uploadAttachment(params.slug ?? "", params.token ?? "", {
+          body: request.stream,
+          contentType: request.headers["content-type"],
+          contentLength: contentLength === undefined ? undefined : Number(contentLength),
+        });
+      }).pipe(
+        Effect.catchTag("McpRelayError", (error) =>
+          Effect.succeed(HttpServerResponse.text(error.message, { status: 502 })),
+        ),
+      ),
+    );
   }),
 );

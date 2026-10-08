@@ -47,7 +47,7 @@ const adminSessionWithRequiredScopes = (session: EnvironmentClientSession) => {
     ? Effect.succeed(session)
     : Effect.fail(
         new EnvironmentFailure({
-          message: `Admin bearer token is missing required scope ${missingScope}`,
+          message: `Admin bearer token is missing required scope ${missingScope}; pair the environment again`,
           status: 403,
         }),
       );

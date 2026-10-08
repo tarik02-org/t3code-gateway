@@ -147,7 +147,7 @@ export const validateEnvironmentInput = (
       );
       if (missingScope !== undefined) {
         return yield* new EnvironmentFailure({
-          message: `Admin bearer token is missing required scope ${missingScope}`,
+          message: `Admin bearer token is missing required scope ${missingScope}; pair the environment again`,
         });
       }
     }

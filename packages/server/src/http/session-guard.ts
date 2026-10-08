@@ -42,7 +42,13 @@ const sessionRequiredFor = (
   }
 
   // Relay clients authenticate with their own bearer tokens, and sign in through OAuth to get them.
-  if (path === MCP_PATH || path.startsWith("/oauth/") || path.startsWith("/.well-known/oauth-")) {
+  // Uploads under `/mcp/` carry a token the environment signed.
+  if (
+    path === MCP_PATH ||
+    path.startsWith(`${MCP_PATH}/`) ||
+    path.startsWith("/oauth/") ||
+    path.startsWith("/.well-known/oauth-")
+  ) {
     return false;
   }
 
