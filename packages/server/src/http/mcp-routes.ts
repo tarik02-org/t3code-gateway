@@ -80,7 +80,7 @@ export const layer = Layer.effectDiscard(
         }
         const params = yield* HttpRouter.params;
         const contentLength = request.headers["content-length"];
-        return yield* relay.uploadAttachment(params.slug ?? "", params.token ?? "", {
+        return yield* relay.uploadAttachment(params.slug ?? "", params["*"] ?? "", {
           body: request.stream,
           contentType: request.headers["content-type"],
           contentLength: contentLength === undefined ? undefined : Number(contentLength),
