@@ -63,7 +63,8 @@ const UPSTREAM_ATTACHMENT_UPLOAD_PREFIX = "/api/attachments/upload/";
 const UPLOAD_TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 /** Where a relay client posts an upload: the gateway, which passes it to the environment that signed it. */
-export const RELAY_ATTACHMENT_UPLOAD_ROUTE = "/mcp/environments/:slug/attachments/upload/:token";
+// The token is a wildcard: the router drops path parameters over 100 characters, and tokens run longer.
+export const RELAY_ATTACHMENT_UPLOAD_ROUTE = "/mcp/environments/:slug/attachments/upload/*";
 
 const relayAttachmentUploadPath = (slug: string, token: string) =>
   `/mcp/environments/${encodeURIComponent(slug)}/attachments/upload/${token}`;
