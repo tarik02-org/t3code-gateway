@@ -14,6 +14,7 @@ import { Input } from "../../components/ui/input.tsx";
 import { Label } from "../../components/ui/label.tsx";
 import { QRCodeSvg } from "../../components/ui/qr-code.tsx";
 import { Switch } from "../../components/ui/switch.tsx";
+import { toastManager } from "../../components/ui/toast.tsx";
 import { createEnvironmentPairingLink } from "../../lib/gateway-api.ts";
 import { Field } from "./field.tsx";
 import { usePairingDialogStore } from "./pairing-dialog-store.ts";
@@ -46,9 +47,16 @@ export function PairingDialog() {
         label: clientLabel,
         scopes,
       }),
+    onMutate: () => setError(null),
     onSuccess: setPairingLink,
     onError: (cause) => {
-      setError(cause instanceof Error ? cause.message : "Create failed");
+      const message = cause instanceof Error ? cause.message : "Create failed";
+      setError(message);
+      toastManager.add({
+        type: "error",
+        title: "Pairing link failed",
+        description: message,
+      });
     },
   });
 
