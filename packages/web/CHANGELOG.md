@@ -1,5 +1,14 @@
 # @t3code-gateway/web
 
+## 0.6.1
+
+### Patch Changes
+
+- cde53e0: Show a notification when creating a pairing link fails. The error was only rendered at the bottom
+  of the dialog's scrollable permissions panel, so a rejected request looked like a spinner that
+  silently stopped.
+  - @t3code-gateway/contracts@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
