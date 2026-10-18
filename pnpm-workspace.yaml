@@ -3,7 +3,7 @@ packages:
 
 catalog:
   "@effect/platform-node": 4.0.0-beta.78
-  "@effect/tsgo": 0.13.2
+  "@effect/tsgo": 0.53.4
   "@tanstack/react-query": 5.104.4
   "@tanstack/react-router": 1.170.45
   "@tanstack/react-start": 1.169.3
