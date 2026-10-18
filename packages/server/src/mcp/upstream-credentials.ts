@@ -234,15 +234,13 @@ export const make = Effect.gen(function* () {
 
   const listStatus = credentialRepository.listCredentials.pipe(
     Effect.map((rows) =>
-      rows.map(
-        (row): McpUpstreamCredentialStatus => ({
-          environmentId: row.environmentId,
-          access: row.access,
-          expiresAt: row.expiresAt,
-          lastAttemptAt: row.lastAttemptAt,
-          lastFailure: row.lastFailure,
-        }),
-      ),
+      rows.map((row): McpUpstreamCredentialStatus => ({
+        environmentId: row.environmentId,
+        access: row.access,
+        expiresAt: row.expiresAt,
+        lastAttemptAt: row.lastAttemptAt,
+        lastFailure: row.lastFailure,
+      })),
     ),
   );
 
