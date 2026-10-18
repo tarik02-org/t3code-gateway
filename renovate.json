@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "enabledManagers": ["custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "T3 Code web apps bundled into the container",
+      "managerFilePatterns": ["/^packages/server/src/bin/download-t3code-web-dist\\.ts$/"],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+version: \"(?<currentValue>[^\"]+)\",\\s+sha256: \"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Keep the nightly pin on nightlies, skipping preview builds",
+      "matchDepNames": ["pingdotgg/t3code"],
+      "matchCurrentValue": "/-nightly\\./",
+      "ignoreUnstable": false,
+      "allowedVersions": "/-nightly\\./",
+      "schedule": ["* 0-5 * * 1"]
+    }
+  ]
+}
