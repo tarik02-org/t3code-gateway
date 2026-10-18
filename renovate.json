@@ -1,26 +1,126 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "enabledManagers": ["custom.regex"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScopeDisabled",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Europe/Kyiv",
+  "schedule": ["* 0-5 * * 1"],
+  "labels": ["dependencies"],
+  "gitIgnoredAuthors": ["311177698+t3code-gateway-release[bot]@users.noreply.github.com"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* 0-5 1 * *"]
+  },
+  "nix": {
+    "enabled": true
+  },
   "customManagers": [
     {
       "customType": "regex",
       "description": "T3 Code web apps bundled into the container",
       "managerFilePatterns": ["/^packages/server/src/bin/download-t3code-web-dist\\.ts$/"],
       "matchStrings": [
-        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+version: \"(?<currentValue>[^\"]+)\",\\s+sha256: \"(?<currentDigest>[a-f0-9]{64})\""
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) packageName=(?<packageName>\\S+)\\s+tag: \"(?<currentValue>[^\"]+)\",\\s+sha256: \"(?<currentDigest>[a-f0-9]{64})\""
       ],
-      "extractVersionTemplate": "^v(?<version>.+)$",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Binaries the Containerfile downloads, annotated with a `# renovate:` comment",
+      "managerFilePatterns": ["/^Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+ARG \\w+=(?<currentValue>\\S+)"
+      ],
+      "extractVersionTemplate": "^v?(?<version>.+)$",
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
     }
   ],
   "packageRules": [
     {
+      "description": "Runtime dependencies ship in the image, so they get a changeset",
+      "matchDepTypes": ["dependencies", "pnpm.catalog.default", "overrides", "pnpm.overrides"],
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "description": "Build and type tooling, wherever it is declared",
+      "matchPackageNames": [
+        "@types/**",
+        "@typescript/**",
+        "typescript",
+        "vite",
+        "vite-plus",
+        "@voidzero-dev/**",
+        "@vitejs/**",
+        "@effect/tsgo",
+        "esbuild",
+        "drizzle-kit",
+        "@changesets/**"
+      ],
+      "semanticCommitType": "chore",
+      "labels": ["dependencies"]
+    },
+    {
+      "matchFileNames": ["packages/screenshots/**"],
+      "semanticCommitType": "chore",
+      "labels": ["dependencies"]
+    },
+    {
+      "description": "Effect betas move together",
+      "matchPackageNames": ["effect", "@effect/**", "!@effect/tsgo"],
+      "groupName": "effect",
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "matchPackageNames": ["vite-plus", "@voidzero-dev/vite-plus-core"],
+      "groupName": "vite-plus"
+    },
+    {
+      "matchPackageNames": ["drizzle-orm", "drizzle-kit"],
+      "groupName": "drizzle",
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "description": "Node runs in CI and in the image; keep every pin on the same release",
+      "matchDepNames": ["node"],
+      "groupName": "node",
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "matchDepNames": ["pnpm"],
+      "groupName": "pnpm"
+    },
+    {
+      "description": "Base image and binaries bundled into the container",
+      "matchFileNames": ["Containerfile"],
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "matchDepNames": ["t3code-web-stable", "t3code-web-nightly"],
+      "semanticCommitType": "fix",
+      "labels": ["dependencies", "changeset"]
+    },
+    {
+      "matchDepNames": ["t3code-web-stable"],
+      "commitMessageTopic": "bundled t3 code web stable"
+    },
+    {
       "description": "Keep the nightly pin on nightlies, skipping preview builds",
-      "matchDepNames": ["pingdotgg/t3code"],
-      "matchCurrentValue": "/-nightly\\./",
+      "matchDepNames": ["t3code-web-nightly"],
+      "commitMessageTopic": "bundled t3 code web nightly",
       "ignoreUnstable": false,
-      "allowedVersions": "/-nightly\\./",
-      "schedule": ["* 0-5 * * 1"]
+      "allowedVersions": "/-nightly\\./"
     }
   ]
 }

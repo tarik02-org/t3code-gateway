@@ -1,3 +1,9 @@
 - name: build-image
   color: "1d76db"
   description: Build a container artifact for this pull request.
+- name: dependencies
+  color: "0366d6"
+  description: Dependency update.
+- name: changeset
+  color: "fbca04"
+  description: Dependency update that ships in the image; gets a changeset automatically.
