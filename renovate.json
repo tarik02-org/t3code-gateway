@@ -90,17 +90,17 @@
       "matchDepNames": ["node"],
       "groupName": "node",
       "semanticCommitType": "fix",
-      "labels": ["dependencies", "changeset"]
+      "labels": ["dependencies", "changeset", "build-image"]
     },
     {
       "matchDepNames": ["pnpm"],
       "groupName": "pnpm"
     },
     {
-      "description": "Base image and binaries bundled into the container",
+      "description": "Base image and binaries bundled into the container; build-image makes CI build the image, since tags such as node:<version>-alpine<version> may not exist",
       "matchFileNames": ["Containerfile"],
       "semanticCommitType": "fix",
-      "labels": ["dependencies", "changeset"]
+      "labels": ["dependencies", "changeset", "build-image"]
     },
     {
       "matchManagers": ["github-actions"],
