@@ -4,7 +4,8 @@ import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
+import * as Hex from "effect/encoding/Hex";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -61,8 +62,8 @@ const makeAuthService = Effect.gen(function* () {
         return;
       }
 
-      const userId = yield* crypto.randomUUIDv4;
-      const generatedPassword = Encoding.encodeBase64Url(yield* crypto.randomBytes(24));
+      const userId = yield* crypto.randomUUIDv4();
+      const generatedPassword = Base64Url.encode(yield* crypto.randomBytes(24));
       const passwordHash = yield* hashPassword(gatewayCrypto, generatedPassword);
       const timestamp = DateTime.formatIso(DateTime.nowUnsafe());
 
@@ -93,17 +94,17 @@ const makeAuthService = Effect.gen(function* () {
   const hashSessionTokenLocal = (token: string) =>
     Effect.gen(function* () {
       const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(token));
-      return Encoding.encodeHex(digest);
+      return Hex.encode(digest);
     });
 
   const createSessionTokenLocal = () =>
     Effect.gen(function* () {
       const bytes = yield* crypto.randomBytes(32);
-      return Encoding.encodeHex(bytes);
+      return Hex.encode(bytes);
     });
   const createSession = (userId: string) =>
     Effect.gen(function* () {
-      const sessionId = yield* crypto.randomUUIDv4;
+      const sessionId = yield* crypto.randomUUIDv4();
       const sessionToken = yield* createSessionTokenLocal();
       const sessionTokenHash = yield* hashSessionTokenLocal(sessionToken);
       const expiresAt = DateTime.formatIso(

@@ -7,13 +7,13 @@ import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Result from "effect/Result";
-import * as HttpBody from "effect/unstable/http/HttpBody";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
-import type * as HttpClientError from "effect/unstable/http/HttpClientError";
-import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
-import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as HttpBody from "effect/http/HttpBody";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientError from "effect/http/HttpClientError";
+import type * as HttpClientRequest from "effect/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Schema from "effect/Schema";
 
 import { joinBaseUrl } from "./urls.ts";
@@ -109,7 +109,7 @@ const responseBodyFailureMessage = (error: HttpClientError.HttpClientError) => {
 };
 
 const readJsonBody = (body: string) =>
-  Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(body).pipe(
+  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(body).pipe(
     Effect.catchTags({
       SchemaError: () =>
         Effect.fail(new EnvironmentFailure({ message: "Environment returned invalid JSON" })),
@@ -622,12 +622,12 @@ const registerMcpOAuthClient = (
 
 const createPkcePair = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
-  const verifier = Encoding.encodeBase64Url(yield* crypto.randomBytes(32));
+  const verifier = Base64Url.encode(yield* crypto.randomBytes(32));
   const challenge = yield* crypto.digest("SHA-256", new TextEncoder().encode(verifier));
   return {
     verifier,
-    challenge: Encoding.encodeBase64Url(challenge),
-    state: Encoding.encodeBase64Url(yield* crypto.randomBytes(16)),
+    challenge: Base64Url.encode(challenge),
+    state: Base64Url.encode(yield* crypto.randomBytes(16)),
   };
 }).pipe(
   Effect.catchTags({
@@ -764,7 +764,7 @@ const readSessionId = (accessToken: string) => {
     message: "Environment returned an unreadable MCP access token",
   });
   const [claims = ""] = accessToken.split(".");
-  const decoded = Encoding.decodeBase64UrlString(claims);
+  const decoded = Base64Url.decodeString(claims);
   if (Result.isFailure(decoded)) {
     return Effect.fail(unreadable);
   }

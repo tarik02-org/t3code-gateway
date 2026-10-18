@@ -10,7 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
-import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClient from "effect/http/HttpClient";
 
 import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";

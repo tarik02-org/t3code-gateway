@@ -11,7 +11,7 @@ export const TraefikWriteFailureReason = Schema.Literals([
   "unknown",
 ]);
 
-export class TraefikWriteError extends Schema.TaggedErrorClass<TraefikWriteError>()(
+export class TraefikWriteError extends Schema.TaggedError<TraefikWriteError>()(
   "TraefikWriteError",
   {
     reason: TraefikWriteFailureReason,

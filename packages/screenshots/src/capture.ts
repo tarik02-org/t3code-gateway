@@ -5,11 +5,11 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpRouter from "effect/http/HttpRouter";
 
 import { screenshotRpcLayer } from "./fixtures.ts";
 
-export class BrowserContextUnavailableError extends Schema.TaggedErrorClass<BrowserContextUnavailableError>()(
+export class BrowserContextUnavailableError extends Schema.TaggedError<BrowserContextUnavailableError>()(
   "BrowserContextUnavailableError",
   { message: Schema.String },
 ) {}

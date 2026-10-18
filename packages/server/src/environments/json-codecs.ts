@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 const StringArrayFromJsonString = Schema.fromJsonString(Schema.Array(Schema.String));
-const UnknownFromJsonString = Schema.UnknownFromJsonString;
+const UnknownFromJsonString = Schema.fromJsonString(Schema.Unknown);
 
 export const encodeStringArrayJson = (values: ReadonlyArray<string>) =>
   Schema.encodeSync(StringArrayFromJsonString)(values);

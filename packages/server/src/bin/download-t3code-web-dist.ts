@@ -5,8 +5,8 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import * as Command from "effect/unstable/cli/Command";
-import * as Flag from "effect/unstable/cli/Flag";
+import * as Command from "effect/cli/Command";
+import * as Flag from "effect/cli/Flag";
 
 import {
   makeReleaseArchiveInstaller,
@@ -32,7 +32,7 @@ const bundledReleases = [
 const command = Command.make(
   "download-t3code-web-dist",
   {
-    output: Flag.directory("output").pipe(
+    output: Flag.Directory("output").pipe(
       Flag.withDefault("packaging/runtime/t3code-web-dist"),
       Flag.withDescription("Directory that receives one web app per channel."),
     ),

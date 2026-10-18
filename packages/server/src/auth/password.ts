@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Result from "effect/Result";
 
 import { GatewayCrypto } from "../crypto/gateway-crypto.ts";
@@ -25,7 +25,7 @@ export const hashPassword = (crypto: GatewayCrypto["Service"], password: string)
       ...scryptOptions,
     });
 
-    return `scrypt:${Encoding.encodeBase64Url(salt)}:${Encoding.encodeBase64Url(key)}`;
+    return `scrypt:${Base64Url.encode(salt)}:${Base64Url.encode(key)}`;
   });
 
 export const verifyPassword = (
@@ -39,8 +39,8 @@ export const verifyPassword = (
       return false;
     }
 
-    const decodedSalt = Encoding.decodeBase64Url(encodedSalt);
-    const decodedKey = Encoding.decodeBase64Url(encodedKey);
+    const decodedSalt = Base64Url.decode(encodedSalt);
+    const decodedKey = Base64Url.decode(encodedKey);
     if (Result.isFailure(decodedSalt) || Result.isFailure(decodedKey)) {
       return false;
     }

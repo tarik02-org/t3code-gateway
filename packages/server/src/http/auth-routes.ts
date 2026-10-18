@@ -7,9 +7,9 @@ import {
   LoginRequest,
   LoginResponse,
 } from "@t3code-gateway/contracts/schemas";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 import { AuthService } from "../auth/service.ts";
 import { SESSION_COOKIE_NAME } from "../auth/constants.ts";

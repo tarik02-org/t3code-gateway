@@ -7,7 +7,7 @@ import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import type * as PlatformError from "effect/PlatformError";
 import * as Result from "effect/Result";
@@ -73,13 +73,13 @@ export const authorizationServerMetadata = (urls: McpOAuthUrls) => ({
 });
 
 /** A request naming an unknown client or redirect: shown to the user, never redirected. */
-export class McpOAuthPageError extends Schema.TaggedErrorClass<McpOAuthPageError>()(
+export class McpOAuthPageError extends Schema.TaggedError<McpOAuthPageError>()(
   "McpOAuthPageError",
   { description: Schema.String },
 ) {}
 
 /** A protocol error the client receives through its verified redirect. */
-export class McpOAuthRedirectError extends Schema.TaggedErrorClass<McpOAuthRedirectError>()(
+export class McpOAuthRedirectError extends Schema.TaggedError<McpOAuthRedirectError>()(
   "McpOAuthRedirectError",
   {
     redirectUri: Schema.String,
@@ -90,7 +90,7 @@ export class McpOAuthRedirectError extends Schema.TaggedErrorClass<McpOAuthRedir
 ) {}
 
 /** RFC 7591 §3.2.2. */
-export class McpOAuthRegistrationError extends Schema.TaggedErrorClass<McpOAuthRegistrationError>()(
+export class McpOAuthRegistrationError extends Schema.TaggedError<McpOAuthRegistrationError>()(
   "McpOAuthRegistrationError",
   {
     error: Schema.Literals(["invalid_client_metadata", "invalid_redirect_uri"]),
@@ -99,7 +99,7 @@ export class McpOAuthRegistrationError extends Schema.TaggedErrorClass<McpOAuthR
 ) {}
 
 /** RFC 6749 §5.2. */
-export class McpOAuthTokenError extends Schema.TaggedErrorClass<McpOAuthTokenError>()(
+export class McpOAuthTokenError extends Schema.TaggedError<McpOAuthTokenError>()(
   "McpOAuthTokenError",
   {
     error: Schema.Literals([
@@ -311,7 +311,7 @@ export const make = Effect.gen(function* () {
         .encrypt(encodeRegisteredClient({ v: 1, name, redirectUris }))
         .pipe(sealFailure);
       return {
-        clientId: `${CLIENT_ID_PREFIX}${Encoding.encodeBase64Url(sealed)}`,
+        clientId: `${CLIENT_ID_PREFIX}${Base64Url.encode(sealed)}`,
         name,
         redirectUris,
       } satisfies RegisteredMcpClient;
@@ -322,7 +322,7 @@ export const make = Effect.gen(function* () {
       if (clientId === undefined || !clientId.startsWith(CLIENT_ID_PREFIX)) {
         return null;
       }
-      const sealed = Encoding.decodeBase64Url(clientId.slice(CLIENT_ID_PREFIX.length));
+      const sealed = Base64Url.decode(clientId.slice(CLIENT_ID_PREFIX.length));
       if (Result.isFailure(sealed)) {
         return null;
       }
@@ -418,7 +418,7 @@ export const make = Effect.gen(function* () {
           pendingCodes.delete(code);
         }
       }
-      const code = Encoding.encodeBase64Url(
+      const code = Base64Url.encode(
         yield* crypto.randomBytes(32).pipe(Effect.catchTags({ PlatformError: platformFailure })),
       );
       pendingCodes.set(code, {
@@ -510,13 +510,13 @@ export const make = Effect.gen(function* () {
       const challenge = yield* crypto
         .digest("SHA-256", new TextEncoder().encode(request.code_verifier))
         .pipe(Effect.catchTags({ PlatformError: platformFailure }));
-      if (Encoding.encodeBase64Url(challenge) !== authorization.codeChallenge) {
+      if (Base64Url.encode(challenge) !== authorization.codeChallenge) {
         return yield* tokenError("invalid_grant", "The code verifier does not match the challenge");
       }
 
-      const grantId = yield* crypto.randomUUIDv4.pipe(
-        Effect.catchTags({ PlatformError: platformFailure }),
-      );
+      const grantId = yield* crypto
+        .randomUUIDv4()
+        .pipe(Effect.catchTags({ PlatformError: platformFailure }));
       const tokens = yield* issueTokens(grantId, now);
       yield* grantRepository.createGrant(
         {

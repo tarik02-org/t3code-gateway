@@ -3,7 +3,7 @@ import * as Console from "effect/Console";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Hex from "effect/encoding/Hex";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -71,7 +71,7 @@ const makeTraefikReconciler = Effect.gen(function* () {
         return undefined;
       }
       const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(content));
-      return Encoding.encodeHex(digest);
+      return Hex.encode(digest);
     });
 
   const writeAtomic = (targetPath: string, content: string) =>
@@ -126,7 +126,7 @@ const makeTraefikReconciler = Effect.gen(function* () {
           return;
         }
 
-        const nextHash = Encoding.encodeHex(
+        const nextHash = Hex.encode(
           yield* crypto.digest("SHA-256", new TextEncoder().encode(yaml)),
         );
         const existingHash = yield* readFileHash(dynamicFile);

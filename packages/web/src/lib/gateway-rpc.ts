@@ -1,10 +1,10 @@
 import { GatewayRpcs } from "@t3code-gateway/contracts/rpc";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as RpcClient from "effect/unstable/rpc/RpcClient";
-import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
-import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as RpcClient from "effect/rpc/RpcClient";
+import type * as RpcClientError from "effect/rpc/RpcClientError";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
 
 type GatewayRpcClient = RpcClient.FromGroup<typeof GatewayRpcs, RpcClientError.RpcClientError>;
 

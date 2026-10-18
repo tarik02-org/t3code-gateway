@@ -3,10 +3,10 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientError from "effect/unstable/http/HttpClientError";
-import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 import { captureScreenshots } from "./capture.ts";
 
@@ -36,12 +36,12 @@ const ApertureCdpDiscoveryResponse = Schema.Struct({
   webSocketDebuggerUrl: Schema.URLFromString,
 });
 
-class ApertureTenantRequiredError extends Schema.TaggedErrorClass<ApertureTenantRequiredError>()(
+class ApertureTenantRequiredError extends Schema.TaggedError<ApertureTenantRequiredError>()(
   "ApertureTenantRequiredError",
   { message: Schema.String },
 ) {}
 
-class ApertureChromiumUnavailableError extends Schema.TaggedErrorClass<ApertureChromiumUnavailableError>()(
+class ApertureChromiumUnavailableError extends Schema.TaggedError<ApertureChromiumUnavailableError>()(
   "ApertureChromiumUnavailableError",
   { message: Schema.String },
 ) {}

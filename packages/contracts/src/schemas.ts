@@ -96,13 +96,10 @@ export const InstallT3CodeWebReleaseRequest = Schema.Struct({
 
 export type InstallT3CodeWebReleaseRequest = typeof InstallT3CodeWebReleaseRequest.Type;
 
-export class T3CodeWebFailure extends Schema.TaggedErrorClass<T3CodeWebFailure>()(
-  "T3CodeWebFailure",
-  {
-    message: Schema.String,
-    status: Schema.optional(Schema.Number),
-  },
-) {}
+export class T3CodeWebFailure extends Schema.TaggedError<T3CodeWebFailure>()("T3CodeWebFailure", {
+  message: Schema.String,
+  status: Schema.optional(Schema.Number),
+}) {}
 
 export const LoginRequest = Schema.Struct({
   username: Schema.String,
@@ -131,7 +128,7 @@ export const ChangePasswordRequest = Schema.Struct({
 
 export type ChangePasswordRequest = typeof ChangePasswordRequest.Type;
 
-export class AuthFailure extends Schema.TaggedErrorClass<AuthFailure>()("AuthFailure", {
+export class AuthFailure extends Schema.TaggedError<AuthFailure>()("AuthFailure", {
   message: Schema.String,
 }) {}
 
@@ -282,7 +279,7 @@ export const EnvironmentPairingLink = Schema.Struct({
 
 export type EnvironmentPairingLink = typeof EnvironmentPairingLink.Type;
 
-export class EnvironmentFailure extends Schema.TaggedErrorClass<EnvironmentFailure>()(
+export class EnvironmentFailure extends Schema.TaggedError<EnvironmentFailure>()(
   "EnvironmentFailure",
   {
     message: Schema.String,
@@ -421,7 +418,7 @@ export const McpUpstreamCredentialStatus = Schema.Struct({
 
 export type McpUpstreamCredentialStatus = typeof McpUpstreamCredentialStatus.Type;
 
-export class McpFailure extends Schema.TaggedErrorClass<McpFailure>()("McpFailure", {
+export class McpFailure extends Schema.TaggedError<McpFailure>()("McpFailure", {
   message: Schema.String,
 }) {}
 
