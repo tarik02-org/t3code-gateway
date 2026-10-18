@@ -7,7 +7,7 @@
     "dev": "vp dev",
     "build": "vp build && { test ! -f dist/client/_shell.html || cp dist/client/_shell.html dist/client/index.html; }",
     "preview": "vp preview",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

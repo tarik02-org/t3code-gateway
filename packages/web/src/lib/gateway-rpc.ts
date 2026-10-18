@@ -3,10 +3,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as RpcClient from "effect/unstable/rpc/RpcClient";
-import type { RpcClientError } from "effect/unstable/rpc/RpcClientError";
+import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
 import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
 
-type GatewayRpcClient = RpcClient.FromGroup<typeof GatewayRpcs, RpcClientError>;
+type GatewayRpcClient = RpcClient.FromGroup<typeof GatewayRpcs, RpcClientError.RpcClientError>;
 
 const gatewayRpcProtocolLayer = RpcClient.layerProtocolHttp({
   url: "/api/gateway/rpc",

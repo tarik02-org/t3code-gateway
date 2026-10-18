@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsgo --noEmit",
+    "build": "tsc --noEmit",
     "capture": "node src/main.ts",
     "install:chromium": "effect-playwright install chromium",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",

@@ -2,7 +2,7 @@ import { EffectDrizzleQueryError, MigratorInitError } from "drizzle-orm/effect-c
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import type * as SqlError from "effect/unstable/sql/SqlError";
 
 const DatabaseOperation = Schema.Literals([
   "ensureDirectory",
@@ -87,7 +87,7 @@ export const reasonFromPlatformError = (
   return "unknown";
 };
 
-const reasonFromSqlError = (error: SqlError): DatabaseFailureReason => {
+const reasonFromSqlError = (error: SqlError.SqlError): DatabaseFailureReason => {
   const tag = error.reason["_tag"];
   if (tag === "ConnectionError") {
     return "connection";
@@ -127,7 +127,7 @@ export const migrationError = {
         cause: error,
       }),
     ),
-  SqlError: (error: SqlError) =>
+  SqlError: (error: SqlError.SqlError) =>
     Effect.fail(
       new DatabaseError({
         operation: "migrate",

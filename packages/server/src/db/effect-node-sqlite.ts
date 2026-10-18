@@ -22,7 +22,7 @@ import type {
   SQLiteTransactionConfig,
 } from "drizzle-orm/sqlite-core/session";
 import * as Effect from "effect/Effect";
-import { classifySqliteError, SqlError } from "effect/unstable/sql/SqlError";
+import * as SqlError from "effect/unstable/sql/SqlError";
 
 export interface EffectNodeSqliteQueryEffectHKT extends QueryEffectHKTBase {
   readonly error: EffectDrizzleQueryError;
@@ -32,8 +32,8 @@ export interface EffectNodeSqliteQueryEffectHKT extends QueryEffectHKTBase {
 export type EffectNodeSqliteRunResult = StatementResultingChanges;
 
 const toSqlError = (cause: unknown, operation: string) =>
-  new SqlError({
-    reason: classifySqliteError(cause, { operation }),
+  new SqlError.SqlError({
+    reason: SqlError.classifySqliteError(cause, { operation }),
   });
 
 const asSqliteParams = (params: unknown[]): SQLInputValue[] => params as SQLInputValue[];
@@ -66,7 +66,7 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
     this.options = options;
   }
 
-  executeRaw(command: string): Effect.Effect<EffectNodeSqliteRunResult, SqlError> {
+  executeRaw(command: string): Effect.Effect<EffectNodeSqliteRunResult, SqlError.SqlError> {
     return Effect.try({
       try: () => this.client.prepare(command).run(),
       catch: (cause) => toSqlError(cause, "execute"),
@@ -148,7 +148,7 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
       >,
     ) => Effect.Effect<A, E, R>,
     config: SQLiteTransactionConfig = {},
-  ): Effect.Effect<A, E | SqlError, R> {
+  ): Effect.Effect<A, E | SqlError.SqlError, R> {
     const tx = new EffectNodeSqliteTransaction(this.dialect, this, this.relations);
     const begin = `begin${config.behavior ? ` ${config.behavior}` : ""}`;
 
@@ -192,7 +192,7 @@ class EffectNodeSqliteTransaction<TRelations extends AnyRelations> extends SQLit
         TRelations
       >,
     ) => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | SqlError, R> {
+  ): Effect.Effect<A, E | SqlError.SqlError, R> {
     const savepointName = `sp${this.nestedIndex + 1}`;
     const tx = new EffectNodeSqliteTransaction(
       this.session.dialect,
