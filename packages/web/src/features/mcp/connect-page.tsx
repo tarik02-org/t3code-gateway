@@ -94,7 +94,7 @@ export function ConnectPage() {
     (environmentIds === null || environmentIds.length > 0);
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-8 text-foreground">
+    <main className="grid h-dvh place-items-center overflow-y-auto px-4 py-8 text-foreground">
       <section className="dialog-glass w-full max-w-lg rounded-2xl border p-5 text-card-foreground">
         <div className="mb-5 flex items-center gap-3">
           <T3Logo className="h-3" />
