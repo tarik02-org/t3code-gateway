@@ -192,14 +192,15 @@ interface CachedTools {
   readonly fetchedAt: number;
 }
 
-const withEnvironmentArgument = (tool: Tool, slugs: ReadonlyArray<string>): Tool => ({
+// No slug enum: it would leave out every environment whose tool listing failed and go stale as
+// environments change. callTool validates the slug and names the reachable ones instead.
+const withEnvironmentArgument = (tool: Tool): Tool => ({
   ...tool,
   inputSchema: {
     ...tool.inputSchema,
     properties: {
       [ENVIRONMENT_ARGUMENT]: {
         type: "string",
-        enum: [...slugs],
         description: `Slug of the T3 Code environment to run in. \`${LIST_ENVIRONMENTS_TOOL}\` lists them.`,
       },
       ...tool.inputSchema.properties,
@@ -403,38 +404,28 @@ export const make = Effect.gen(function* () {
         reachable,
         (environment) =>
           environmentTools(environment, caller.access).pipe(
-            Effect.map((tools) => ({ environment, tools })),
             Effect.catch((cause) =>
               Effect.logWarning("Could not list MCP tools of environment").pipe(
                 Effect.annotateLogs({
                   environmentId: environment.environmentId,
                   reason: cause.message,
                 }),
-                Effect.as({ environment, tools: [] satisfies ReadonlyArray<Tool> }),
+                Effect.as<ReadonlyArray<Tool>>([]),
               ),
             ),
           ),
         { concurrency: "unbounded" },
       );
 
-      const byName = new Map<string, { tool: Tool; slugs: Array<string> }>();
-      for (const { environment, tools } of listed) {
+      const byName = new Map<string, Tool>();
+      for (const tools of listed) {
         for (const tool of tools) {
-          if (!isRelayedTool(tool.name)) {
-            continue;
-          }
-          const entry = byName.get(tool.name);
-          if (entry === undefined) {
-            byName.set(tool.name, { tool, slugs: [environment.slug] });
-          } else {
-            entry.slugs.push(environment.slug);
+          if (isRelayedTool(tool.name) && !byName.has(tool.name)) {
+            byName.set(tool.name, tool);
           }
         }
       }
-      return [
-        listEnvironmentsTool,
-        ...[...byName.values()].map(({ tool, slugs }) => withEnvironmentArgument(tool, slugs)),
-      ];
+      return [listEnvironmentsTool, ...[...byName.values()].map(withEnvironmentArgument)];
     });
 
   const listEnvironments = (caller: McpCaller) =>
