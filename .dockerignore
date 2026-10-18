@@ -15,5 +15,3 @@ docker-bake.hcl
 !packaging/runtime/
 !packaging/runtime/**
 packaging/runtime/t3code-web-dist
-packaging/runtime/.t3code-web-dist
-packaging/runtime/T3-Code-Web-*.zip

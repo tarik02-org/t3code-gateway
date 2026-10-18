@@ -6,8 +6,6 @@ dist
 packaging/runtime/app/*
 !packaging/runtime/app/.gitkeep
 packaging/runtime/t3code-web-dist
-packaging/runtime/.t3code-web-dist
-packaging/runtime/T3-Code-Web-*.zip
 
 packages/*/node_modules
 packages/*/dist
