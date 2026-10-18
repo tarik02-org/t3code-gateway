@@ -8,10 +8,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer";
-import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
-import * as RpcServer from "effect/unstable/rpc/RpcServer";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpStaticServer from "effect/http/HttpStaticServer";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
+import * as RpcServer from "effect/rpc/RpcServer";
 
 import { AuthService } from "../auth/service.ts";
 import { layer as secretEncryptionLayer } from "../crypto/secret-encryption.ts";

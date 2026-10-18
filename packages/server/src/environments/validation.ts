@@ -2,7 +2,7 @@ import type { EnvironmentInput } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
+import type * as HttpClient from "effect/http/HttpClient";
 
 import type { GatewayConfig } from "../config.ts";
 import { EnvironmentRepository } from "../db/environment-repository.ts";

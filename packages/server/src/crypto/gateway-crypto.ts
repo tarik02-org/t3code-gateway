@@ -39,7 +39,7 @@ export interface Aes256GcmDecryptInput {
   readonly ciphertextWithTag: Uint8Array;
 }
 
-export class GatewayCryptoError extends Schema.TaggedErrorClass<GatewayCryptoError>()(
+export class GatewayCryptoError extends Schema.TaggedError<GatewayCryptoError>()(
   "GatewayCryptoError",
   {
     operation: GatewayCryptoOperation,

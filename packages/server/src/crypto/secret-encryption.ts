@@ -29,7 +29,7 @@ export class SecretEncryption extends Context.Service<
   }
 >()("@t3code-gateway/server/crypto/secret-encryption/SecretEncryption") {}
 
-export class SecretEncryptionError extends Schema.TaggedErrorClass<SecretEncryptionError>()(
+export class SecretEncryptionError extends Schema.TaggedError<SecretEncryptionError>()(
   "SecretEncryptionError",
   {
     operation: SecretEncryptionOperation,

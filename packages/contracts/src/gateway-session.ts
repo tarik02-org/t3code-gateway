@@ -1,5 +1,5 @@
 import * as Context from "effect/Context";
-import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
+import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 
 export class GatewayRequestContext extends Context.Service<
   GatewayRequestContext,

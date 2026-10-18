@@ -22,7 +22,7 @@ import type {
   SQLiteTransactionConfig,
 } from "drizzle-orm/sqlite-core/session";
 import * as Effect from "effect/Effect";
-import * as SqlError from "effect/unstable/sql/SqlError";
+import * as SqlError from "effect/sql/SqlError";
 
 export interface EffectNodeSqliteQueryEffectHKT extends QueryEffectHKTBase {
   readonly error: EffectDrizzleQueryError;

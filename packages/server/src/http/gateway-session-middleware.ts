@@ -5,8 +5,8 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Cookies from "effect/unstable/http/Cookies";
-import * as Headers from "effect/unstable/http/Headers";
+import * as Cookies from "effect/http/Cookies";
+import * as Headers from "effect/http/Headers";
 
 import { SESSION_COOKIE_NAME } from "../auth/constants.ts";
 import { configLayer, GatewayRuntimeConfig } from "../config.ts";

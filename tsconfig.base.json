@@ -24,6 +24,7 @@
         "namespaceImportPackages": ["@effect/platform-node", "effect"],
         "diagnosticSeverity": {
           "preferNamespaceImport": "error",
+          "unstableApiUsage": "off",
           "anyUnknownInErrorContext": "error",
           "unsafeEffectTypeAssertion": "error",
           "instanceOfSchema": "error",

@@ -5,12 +5,12 @@ import { Playwright } from "effect-playwright";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Command from "effect/unstable/cli/Command";
-import * as Flag from "effect/unstable/cli/Flag";
+import * as Command from "effect/cli/Command";
+import * as Flag from "effect/cli/Flag";
 
 import { regenerateScreenshots, regenerateScreenshotsWithAperture } from "./command.ts";
 
-const outputFlag = Flag.directory("output").pipe(
+const outputFlag = Flag.Directory("output").pipe(
   Flag.optional,
   Flag.withDescription("Output directory. Defaults to .github/screenshots."),
 );
@@ -19,10 +19,10 @@ const localCommand = Command.make(
   "local",
   {
     output: outputFlag,
-    headful: Flag.boolean("headful").pipe(
+    headful: Flag.Boolean("headful").pipe(
       Flag.withDescription("Show the local Chromium window while capturing."),
     ),
-    executablePath: Flag.file("executable-path", { mustExist: true }).pipe(
+    executablePath: Flag.File("executable-path", { mustExist: true }).pipe(
       Flag.optional,
       Flag.withDescription("Use this Chromium executable instead of the managed browser."),
     ),
@@ -42,7 +42,7 @@ const cdpCommand = Command.make(
   "cdp",
   {
     output: outputFlag,
-    cdpUrl: Flag.string("cdp-url").pipe(
+    cdpUrl: Flag.String("cdp-url").pipe(
       Flag.withDescription("Chrome DevTools Protocol endpoint to connect to."),
     ),
   },
@@ -57,20 +57,20 @@ const apertureCommand = Command.make(
   "aperture",
   {
     output: outputFlag,
-    baseUrl: Flag.string("base-url").pipe(
-      Flag.withFallbackConfig(Config.string("APERTURE_BASE_URL")),
+    baseUrl: Flag.String("base-url").pipe(
+      Flag.withFallbackConfig(Config.String("APERTURE_BASE_URL")),
       Flag.mapTryCatch(
         (baseUrl) => new URL(baseUrl),
         () => "Aperture base URL must be a valid URL.",
       ),
       Flag.withDescription("Aperture origin. Defaults to APERTURE_BASE_URL."),
     ),
-    token: Flag.redacted("token").pipe(
-      Flag.withFallbackConfig(Config.redacted("APERTURE_TOKEN")),
+    token: Flag.Redacted("token").pipe(
+      Flag.withFallbackConfig(Config.Redacted("APERTURE_TOKEN")),
       Flag.withDescription("Aperture API token. Defaults to APERTURE_TOKEN."),
     ),
-    tenantId: Flag.string("tenant-id").pipe(
-      Flag.withFallbackConfig(Config.string("APERTURE_TENANT_ID")),
+    tenantId: Flag.String("tenant-id").pipe(
+      Flag.withFallbackConfig(Config.String("APERTURE_TENANT_ID")),
       Flag.optional,
       Flag.withDescription("Tenant ID for a system-admin token. Defaults to APERTURE_TENANT_ID."),
     ),

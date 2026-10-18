@@ -24,9 +24,9 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
-import * as HttpBody from "effect/unstable/http/HttpBody";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+import * as HttpBody from "effect/http/HttpBody";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-repository.ts";
 import { joinBaseUrl } from "../environments/urls.ts";
@@ -148,7 +148,7 @@ class RelayRpcError extends Error {
 const fromUpstream = (error: McpError) =>
   new RelayRpcError(error.code, error.message.replace(/^MCP error -?\d+: /, ""), error.data);
 
-export class McpRelayError extends Schema.TaggedErrorClass<McpRelayError>()("McpRelayError", {
+export class McpRelayError extends Schema.TaggedError<McpRelayError>()("McpRelayError", {
   message: Schema.String,
 }) {}
 

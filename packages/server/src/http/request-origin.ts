@@ -1,5 +1,5 @@
 import * as Option from "effect/Option";
-import type * as Headers from "effect/unstable/http/Headers";
+import type * as Headers from "effect/http/Headers";
 
 /**
  * The origin the client reached: `T3_GATEWAY_PUBLIC_URL` when set, otherwise

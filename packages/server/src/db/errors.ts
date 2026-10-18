@@ -2,7 +2,7 @@ import { EffectDrizzleQueryError, MigratorInitError } from "drizzle-orm/effect-c
 import * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
-import type * as SqlError from "effect/unstable/sql/SqlError";
+import type * as SqlError from "effect/sql/SqlError";
 
 const DatabaseOperation = Schema.Literals([
   "ensureDirectory",
@@ -45,7 +45,7 @@ const databaseMessage = (operation: DatabaseOperation, reason: DatabaseFailureRe
   return `Database ${operation} operation failed: ${reason}`;
 };
 
-export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()("DatabaseError", {
+export class DatabaseError extends Schema.TaggedError<DatabaseError>()("DatabaseError", {
   operation: DatabaseOperation,
   reason: DatabaseFailureReason,
   path: Schema.optionalKey(Schema.String),

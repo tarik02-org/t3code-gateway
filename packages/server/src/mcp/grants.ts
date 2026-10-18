@@ -9,7 +9,7 @@ import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as PlatformError from "effect/PlatformError";
@@ -57,7 +57,7 @@ export const grantRecord = (row: McpGrantRow): McpGrant => ({
 /** A new random bearer token and the hash the gateway stores for it. */
 export const createBearerToken = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
-  const token = `${TOKEN_PREFIX}${Encoding.encodeBase64Url(yield* crypto.randomBytes(32))}`;
+  const token = `${TOKEN_PREFIX}${Base64Url.encode(yield* crypto.randomBytes(32))}`;
   return { token, tokenHash: yield* hashSessionToken(token) };
 });
 
@@ -142,7 +142,7 @@ export const make = Effect.gen(function* () {
         Effect.provideService(Crypto.Crypto, crypto),
       );
       const row: McpGrantRow = {
-        grantId: yield* crypto.randomUUIDv4,
+        grantId: yield* crypto.randomUUIDv4(),
         kind: "token",
         label: grant.label,
         access: input.access,
