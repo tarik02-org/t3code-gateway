@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.28
 
-ARG ALPINE_VERSION=3.23
+ARG ALPINE_VERSION=3.24
 ARG NODE_VERSION=24.13.1
 
 FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS node-runtime
