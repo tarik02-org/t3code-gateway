@@ -11,7 +11,7 @@ ARG TARGETARCH
 # renovate: datasource=github-releases depName=just-containers/s6-overlay versioning=loose
 ARG S6_OVERLAY_VERSION=3.2.3.2
 # renovate: datasource=github-releases depName=traefik/traefik
-ARG TRAEFIK_VERSION=3.7.6
+ARG TRAEFIK_VERSION=3.7.15
 
 RUN apk add --no-cache curl xz
 
