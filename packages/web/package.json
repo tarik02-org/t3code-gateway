@@ -17,7 +17,7 @@
     "@tanstack/react-start": "catalog:",
     "class-variance-authority": "^0.7.1",
     "effect": "catalog:",
-    "lucide-react": "^0.564.0",
+    "lucide-react": "^0.577.0",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.6.7",
     "react": "19.3.1",
