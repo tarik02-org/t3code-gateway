@@ -17,14 +17,14 @@ import {
 const bundledReleases = [
   {
     channel: "stable",
-    // renovate: datasource=github-release-attachments depName=pingdotgg/t3code
-    version: "0.1.0",
+    // renovate: datasource=github-release-attachments depName=t3code-web-stable packageName=pingdotgg/t3code
+    tag: "v0.1.0",
     sha256: "f7703ff1bb8f6243580058b3ccf2c02abb62eba4b991e26bbb1da22f4b56d9b1",
   },
   {
     channel: "nightly",
-    // renovate: datasource=github-release-attachments depName=pingdotgg/t3code
-    version: "0.1.1-nightly.20261018.3302",
+    // renovate: datasource=github-release-attachments depName=t3code-web-nightly packageName=pingdotgg/t3code
+    tag: "v0.1.1-nightly.20261018.3302",
     sha256: "a049e8dc5eff84e25850713c728195a84f20394ef729e8342cc69eb733440023",
   },
 ] as const;
@@ -47,11 +47,12 @@ const command = Command.make(
     yield* Effect.forEach(
       bundledReleases,
       Effect.fn(function* (release) {
-        yield* Effect.logInfo(`Downloading T3 Code ${release.channel} ${release.version}`);
+        const version = release.tag.slice(1);
+        yield* Effect.logInfo(`Downloading T3 Code ${release.channel} ${version}`);
         yield* installReleaseArchive(
           {
-            version: release.version,
-            url: `https://github.com/${upstreamRepository}/releases/download/v${release.version}/${releaseAssetName(release.version)}`,
+            version,
+            url: `https://github.com/${upstreamRepository}/releases/download/${release.tag}/${releaseAssetName(version)}`,
             sha256: release.sha256,
           },
           path.join(output, release.channel),
