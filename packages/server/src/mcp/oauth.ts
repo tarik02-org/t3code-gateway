@@ -235,6 +235,9 @@ export const redirectForError = (error: McpOAuthRedirectError, urls: McpOAuthUrl
     iss: urls.issuer,
   });
 
+const tokenError = (error: McpOAuthTokenError["error"], description: string) =>
+  Effect.fail(new McpOAuthTokenError({ error, description }));
+
 const platformFailure = (error: PlatformError.PlatformError) =>
   Effect.fail(new DatabaseError({ operation: "mcpGrant", reason: "unknown", cause: error }));
 
@@ -469,9 +472,6 @@ export const make = Effect.gen(function* () {
       Effect.provideService(Crypto.Crypto, crypto),
       Effect.catchTags({ PlatformError: platformFailure }),
     );
-
-  const tokenError = (error: McpOAuthTokenError["error"], description: string) =>
-    Effect.fail(new McpOAuthTokenError({ error, description }));
 
   const exchangeCode = (urls: McpOAuthUrls, request: McpTokenRequest) =>
     Effect.gen(function* () {
