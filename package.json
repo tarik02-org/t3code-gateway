@@ -28,7 +28,7 @@
   "scripts": {
     "prepare": "effect-tsgo patch",
     "build": "vp run -r build",
-    "download:t3code-web": "sh packaging/scripts/download-t3code-web-dist.sh",
+    "download:t3code-web": "node packages/server/src/bin/download-t3code-web-dist.ts",
     "package:runtime": "sh packaging/runtime/prepare.sh",
     "screenshots": "pnpm --filter @t3code-gateway/screenshots capture",
     "screenshots:install": "pnpm --filter @t3code-gateway/screenshots install:chromium",

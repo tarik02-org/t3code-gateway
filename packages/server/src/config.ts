@@ -2,6 +2,8 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 
+import { upstreamRepository } from "./t3code-web/release-archive.ts";
+
 export const GatewayConfig = Config.all({
   databasePath: Config.string("T3_GATEWAY_DATABASE_PATH").pipe(
     Config.withDefault("/var/lib/t3code-gateway/gateway.sqlite"),
@@ -33,7 +35,7 @@ export const GatewayConfig = Config.all({
     Config.withDefault("/data/t3code-web"),
   ),
   t3codeWebRepository: Config.string("T3_GATEWAY_T3CODE_WEB_REPOSITORY").pipe(
-    Config.withDefault("tarik02-org/t3code"),
+    Config.withDefault(upstreamRepository),
   ),
   githubToken: Config.redacted("T3_GATEWAY_GITHUB_TOKEN").pipe(Config.option),
   /** Pins the origin OAuth and MCP advertise, for proxies that misreport `X-Forwarded-Proto`. */

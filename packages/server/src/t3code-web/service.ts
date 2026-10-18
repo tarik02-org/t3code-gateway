@@ -1,4 +1,3 @@
-import { unzipSync } from "fflate";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -22,6 +21,11 @@ import { T3CodeWebFailure } from "@t3code-gateway/contracts/schemas";
 import { GatewayRuntimeConfig } from "../config.ts";
 import { SecretEncryption } from "../crypto/secret-encryption.ts";
 import { SettingsRepository } from "../db/settings-repository.ts";
+import {
+  makeReleaseArchiveInstaller,
+  releaseAssetName,
+  type T3CodeWebReleaseArchive,
+} from "./release-archive.ts";
 
 const channels = ["stable", "nightly"] as const;
 const versionCollator = new Intl.Collator("en-US", {
@@ -37,6 +41,7 @@ const GitHubRelease = Schema.Struct({
     Schema.Struct({
       name: Schema.String,
       browser_download_url: Schema.String,
+      digest: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   ),
 });
@@ -50,32 +55,6 @@ type VersionRecord = {
 };
 
 const GitHubReleases = Schema.Array(GitHubRelease);
-
-const zipEntryPath = (entry: string, root: string, path: Path.Path) => {
-  const normalized = path.normalize(entry);
-  if (normalized.startsWith("/") || normalized === ".." || normalized.startsWith("../")) {
-    return Effect.fail(
-      new T3CodeWebFailure({ message: "T3 Code update contained an unsafe path" }),
-    );
-  }
-  return Effect.succeed(path.join(root, normalized));
-};
-
-const archiveRoot = (files: Readonly<Record<string, Uint8Array>>) => {
-  if (files["index.html"] !== undefined) {
-    return "";
-  }
-  const roots = new Set(
-    Object.keys(files)
-      .filter((entry) => entry.length > 0)
-      .map((entry) => entry.split("/")[0]),
-  );
-  if (roots.size !== 1) {
-    return null;
-  }
-  const root = [...roots][0];
-  return root !== undefined && files[`${root}/index.html`] !== undefined ? `${root}/` : null;
-};
 
 const storageFailure = (message: string) => new T3CodeWebFailure({ message });
 
@@ -129,10 +108,13 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const secrets = yield* SecretEncryption;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const client = yield* HttpClient.HttpClient;
+  const client = HttpClient.filterStatusOk(yield* HttpClient.HttpClient);
+  const installReleaseArchive = yield* makeReleaseArchiveInstaller;
   const bundledRoot = Option.getOrNull(config.t3codeWebBundledRoot);
   const staticRoot = Option.getOrNull(config.t3codeWebStaticRoot);
-  const downloadedRoot = path.join(config.t3codeWebDataRoot, "versions");
+  const downloadedRoot = path.join(config.t3codeWebDataRoot, "releases");
+  // Builds of the former tarik02-org/t3code fork; their calendar versions outrank upstream's.
+  const legacyDownloadedRoot = path.join(config.t3codeWebDataRoot, "versions");
 
   const downloadedChannelRoot = (channel: T3CodeWebChannel) => path.join(downloadedRoot, channel);
   const bundledChannelRoot = (channel: T3CodeWebChannel) =>
@@ -274,6 +256,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   });
 
   const initialize = Effect.fn("T3CodeWebService.initialize")(function* () {
+    yield* fs.remove(legacyDownloadedRoot, { recursive: true, force: true });
     yield* fs.makeDirectory(downloadedRoot, { recursive: true });
     const current = yield* readSettings;
     const active = yield* activeTarget().pipe(
@@ -281,7 +264,21 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     );
     const records: Array<VersionRecord> = [];
     for (const channel of channels) {
-      records.push(...(yield* listChannelVersions(channel)));
+      const channelRecords = yield* listChannelVersions(channel);
+      records.push(...channelRecords);
+      const pinned = current.pinnedVersions[channel];
+      if (pinned !== null && !channelRecords.some((record) => record.version === pinned)) {
+        yield* settings
+          .update({
+            pinnedVersions: { [channel]: null },
+            updatedAt: DateTime.formatIso(yield* DateTime.now),
+          })
+          .pipe(
+            Effect.catchTag("DatabaseError", () =>
+              Effect.fail(storageFailure("Could not clear a stale T3 Code version pin")),
+            ),
+          );
+      }
     }
     if (active !== null && records.some((record) => record.root === active)) {
       return;
@@ -315,19 +312,18 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     if (token !== null) {
       headers["authorization"] = `Bearer ${token}`;
     }
-    const response = yield* client
-      .get(releasesUrl, { headers })
-      .pipe(
-        Effect.catchTag("HttpClientError", () =>
-          Effect.fail(storageFailure("Could not check GitHub for T3 Code updates")),
+    const response = yield* client.get(releasesUrl, { headers }).pipe(
+      Effect.catchTag("HttpClientError", (error) =>
+        Effect.fail(
+          error.response === undefined
+            ? storageFailure("Could not check GitHub for T3 Code updates")
+            : new T3CodeWebFailure({
+                message: "GitHub did not return a T3 Code release",
+                status: error.response.status,
+              }),
         ),
-      );
-    if (response.status !== 200) {
-      return yield* new T3CodeWebFailure({
-        message: "GitHub did not return a T3 Code release",
-        status: response.status,
-      });
-    }
+      ),
+    );
     const body = yield* response.json.pipe(
       Effect.catchTag("HttpClientError", () =>
         Effect.fail(storageFailure("GitHub returned an invalid T3 Code release response")),
@@ -358,16 +354,21 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     if (matching.length === 0) {
       return yield* storageFailure(`GitHub has no ${channel} T3 Code release`);
     }
-    const result: Array<{ readonly version: string; readonly url: string }> = [];
+    const result: Array<T3CodeWebReleaseArchive> = [];
     for (const release of matching) {
       if (!/^v[0-9][A-Za-z0-9.-]*$/.test(release.tag_name)) {
         return yield* storageFailure("GitHub returned an invalid T3 Code release tag");
       }
       const version = release.tag_name.slice(1);
-      const assetName = `T3-Code-Web-${version}.zip`;
+      const assetName = releaseAssetName(version);
       const asset = release.assets.find((candidate) => candidate.name === assetName);
       if (asset !== undefined) {
-        result.push({ version, url: asset.browser_download_url });
+        const digest = asset.digest ?? null;
+        result.push({
+          version,
+          url: asset.browser_download_url,
+          sha256: digest?.startsWith("sha256:") === true ? digest.slice("sha256:".length) : null,
+        });
       }
     }
     // Newest by version, the order activation uses, so the latest download is the one served.
@@ -385,62 +386,16 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
 
   const downloadRelease = Effect.fn("T3CodeWebService.downloadRelease")(function* (
     channel: T3CodeWebChannel,
-    release: { readonly version: string; readonly url: string },
+    release: T3CodeWebReleaseArchive,
   ) {
     const current = yield* listChannelVersions(channel);
     if (current.some((record) => record.version === release.version)) {
       return;
     }
-    const response = yield* client
-      .get(release.url)
-      .pipe(
-        Effect.catchTag("HttpClientError", () =>
-          Effect.fail(storageFailure("Could not download the T3 Code Web update")),
-        ),
-      );
-    if (response.status !== 200) {
-      return yield* new T3CodeWebFailure({
-        message: "GitHub did not return the T3 Code Web update",
-        status: response.status,
-      });
-    }
-    const buffer = yield* response.arrayBuffer.pipe(
-      Effect.catchTag("HttpClientError", () =>
-        Effect.fail(storageFailure("Could not read the T3 Code Web update")),
-      ),
+    yield* installReleaseArchive(
+      release,
+      path.join(downloadedChannelRoot(channel), release.version),
     );
-    const files = yield* Effect.try({
-      try: () => unzipSync(new Uint8Array(buffer)),
-      catch: () => storageFailure("The T3 Code Web update was not a valid ZIP archive"),
-    });
-    const root = archiveRoot(files);
-    if (root === null) {
-      return yield* storageFailure("The T3 Code Web update did not contain index.html");
-    }
-    const channelRoot = downloadedChannelRoot(channel);
-    const temporary = path.join(channelRoot, `.${release.version}`);
-    const target = path.join(channelRoot, release.version);
-    yield* fs.makeDirectory(channelRoot, { recursive: true });
-    yield* fs.remove(temporary, { recursive: true, force: true });
-    yield* fs.makeDirectory(temporary, { recursive: true });
-    for (const [entry, content] of Object.entries(files)) {
-      if (!entry.startsWith(root)) {
-        return yield* storageFailure("The T3 Code Web update contained an invalid archive layout");
-      }
-      const relativeEntry = entry.slice(root.length);
-      if (relativeEntry === "" || relativeEntry.endsWith("/")) {
-        continue;
-      }
-      const output = yield* zipEntryPath(relativeEntry, temporary, path);
-      yield* fs.makeDirectory(path.dirname(output), { recursive: true });
-      yield* fs.writeFile(output, content);
-    }
-    if (!(yield* fs.exists(path.join(temporary, "index.html")))) {
-      return yield* storageFailure("The T3 Code Web update did not contain index.html");
-    }
-    yield* fs.writeFileString(path.join(temporary, "version.txt"), release.version);
-    yield* fs.remove(target, { recursive: true, force: true });
-    yield* fs.rename(temporary, target);
   });
 
   const download = Effect.fn("T3CodeWebService.download")(function* (channel: T3CodeWebChannel) {
