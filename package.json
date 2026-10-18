@@ -33,7 +33,7 @@
   },
   "overrides": {
     "@effect/platform-node": "catalog:",
-    "@effect/platform-node-shared": "4.0.0-beta.93",
+    "@effect/platform-node-shared": "4.0.5",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "vite": "catalog:"
