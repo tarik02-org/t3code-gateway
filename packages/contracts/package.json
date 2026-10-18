@@ -22,8 +22,8 @@
     }
   },
   "scripts": {
-    "build": "tsgo --noEmit",
-    "typecheck": "tsgo --noEmit"
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "effect": "catalog:"
