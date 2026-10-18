@@ -38,3 +38,11 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+
+# pnpm 10 skipped these scripts silently; nothing here needs them (the server uses node:sqlite).
+allowBuilds:
+  better-sqlite3: false
+  esbuild: false
+
+# Renovate's minimumReleaseAge matches this, so it never proposes a version pnpm would reject.
+minimumReleaseAge: 1440

@@ -8,6 +8,7 @@
   ],
   "timezone": "Europe/Kyiv",
   "schedule": ["* 0-5 * * 1"],
+  "minimumReleaseAge": "1 day",
   "labels": ["dependencies"],
   "gitIgnoredAuthors": ["311177698+t3code-gateway-release[bot]@users.noreply.github.com"],
   "lockFileMaintenance": {
@@ -83,7 +84,9 @@
       "matchPackageNames": ["drizzle-orm", "drizzle-kit"],
       "groupName": "drizzle",
       "semanticCommitType": "fix",
-      "labels": ["dependencies", "changeset"]
+      "labels": ["dependencies", "changeset"],
+      "description": "Skip commit-hash builds such as 1.0.0-rc.5-ab785fc; patches/ is keyed to the installed version",
+      "allowedVersions": "!/-[0-9a-f]{7}$/"
     },
     {
       "description": "Node runs in CI and in the image; keep every pin on the same release",
@@ -104,7 +107,8 @@
     },
     {
       "matchManagers": ["github-actions"],
-      "groupName": "github actions"
+      "groupName": "github actions",
+      "matchDepTypes": ["action"]
     },
     {
       "matchDepNames": ["t3code-web-stable", "t3code-web-nightly"],
