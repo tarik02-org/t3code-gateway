@@ -45,13 +45,14 @@ docker run \
 
 Open `/admin/login`. On first start, the gateway logs the generated password for the `admin` user.
 
-The image includes both stable and nightly T3 Code Web builds, taken from the
-[pingdotgg/t3code](https://github.com/pingdotgg/t3code) release tarballs. After signing in, use the `T3 Code
+The image includes both stable and nightly T3 Code Web builds from
+[t3code-web-builds](https://github.com/tarik02-org/t3code-web-builds), which builds the hosted web
+app from each [pingdotgg/t3code](https://github.com/pingdotgg/t3code) release unchanged. After signing in, use the `T3 Code
 Versions` button to switch channels, pin versions, collect unused downloads, enable automatic
 updates, or check for an update immediately.
 GitHub-backed automatic updates are disabled by default; downloaded builds are stored in the gateway
 data volume. Set `T3_GATEWAY_T3CODE_WEB_REPOSITORY` to take releases from a fork that publishes the
-same `t3-<version>-linux-x64.tar.gz` assets.
+same `T3-Code-Web-<version>.zip` assets.
 
 Update checks call the GitHub API, which allows 60 unauthenticated requests per hour per IP. Set a
 token with no scopes in the `T3 Code Versions` dialog, or pass `T3_GATEWAY_GITHUB_TOKEN` to the
