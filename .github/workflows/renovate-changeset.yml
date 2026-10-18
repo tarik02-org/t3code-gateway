@@ -1,0 +1,56 @@
+name: renovate changeset
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-changeset-${{ github.head_ref }}
+
+jobs:
+  changeset:
+    # renovate.json labels the updates that change what ships in the image.
+    if: >-
+      github.repository == 'tarik02-org/t3code-gateway' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'renovate/') &&
+      contains(github.event.pull_request.labels.*.name, 'changeset')
+    runs-on: ubuntu-latest
+    steps:
+      # Pushes made with GITHUB_TOKEN start no workflows, so CI would skip the changeset commit.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Add changeset
+        env:
+          BRANCH: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          file=".changeset/${BRANCH//\//-}.md"
+          if [[ -f "$file" ]]; then
+            echo "$file already exists"
+            exit 0
+          fi
+
+          summary="$(sed -E 's/^[a-z]+(\([^)]*\))?!?: //' <<<"$TITLE")"
+          printf -- '---\n"@t3code-gateway/server": patch\n---\n\n%s\n' "${summary^}" >"$file"
+
+          # renovate.json lists this author in gitIgnoredAuthors, so Renovate keeps rebasing the branch.
+          git config user.name "t3code-gateway-release[bot]"
+          git config user.email "311177698+t3code-gateway-release[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -m "chore: add changeset"
+          git push
