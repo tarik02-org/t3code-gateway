@@ -1,5 +1,33 @@
 # @t3code-gateway/server
 
+## 0.7.0
+
+### Minor Changes
+
+- 7608652: Take T3 Code Web from upstream `pingdotgg/t3code` instead of the `tarik02-org/t3code` fork. The
+  gateway now unpacks the web app from the release's `t3-<version>-linux-x64.tar.gz` CLI tarball and
+  checks it against the SHA-256 digest GitHub reports. On startup it deletes builds downloaded from
+  the fork, whose calendar versions would outrank upstream's, and clears pins to versions that are no
+  longer installed.
+
+### Patch Changes
+
+- 604796f: Run on stable Effect 4 instead of the 4.0 betas.
+- 3ffc569: Request `settings:write` and `source-control:write` with the pairing code that signs the MCP relay in
+  with full access. T3 Code now requires them for full-access MCP clients and refused the approval,
+  using the code up.
+- 0af1b7b: Accept any environment slug on relayed MCP tools instead of an enum. The enum listed only the
+  environments whose tool listing succeeded, so a model couldn't call the others.
+- 65ad4ec: Update alpine docker tag to v3.24
+- b31c994: Update docker/dockerfile docker tag to v1.28
+- b05cf98: Update dependency just-containers/s6-overlay to v3.2.3.2
+- 3346ba2: Update dependency lucide-react to v1
+- 98b27e2: Update react monorepo to v19.3.1
+- 583858d: Update dependency @tanstack/react-query to v5.104.4
+- df9580e: Update tanstack-router monorepo
+- 13c0c98: Update dependency traefik/traefik to v3.7.15
+- @t3code-gateway/contracts@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

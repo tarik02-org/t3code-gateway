@@ -1,5 +1,16 @@
 # @t3code-gateway/web
 
+## 0.7.0
+
+### Patch Changes
+
+- cde53e0: Show a notification when creating a pairing link fails. The error was only rendered at the bottom
+  of the dialog's scrollable permissions panel, so a rejected request looked like a spinner that
+  silently stopped.
+- 3f3024f: Make the agent connect and login pages scroll. The page body hides overflow, so on short screens the
+  connect form's lower fields and its Approve button were cut off with no way to reach them.
+- @t3code-gateway/contracts@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
