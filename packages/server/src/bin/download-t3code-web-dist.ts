@@ -42,17 +42,23 @@ const command = Command.make(
 
     yield* fs.remove(output, { recursive: true, force: true });
     yield* fs.makeDirectory(output, { recursive: true });
-    for (const release of bundledReleases) {
-      yield* Effect.logInfo(`Downloading T3 Code ${release.channel} ${release.version}`);
-      yield* installReleaseArchive(
-        {
-          version: release.version,
-          url: `https://github.com/${upstreamRepository}/releases/download/v${release.version}/${releaseAssetName(release.version)}`,
-          sha256: release.sha256,
-        },
-        path.join(output, release.channel),
-      );
-    }
+    yield* Effect.forEach(
+      bundledReleases,
+      (release) =>
+        Effect.logInfo(`Downloading T3 Code ${release.channel} ${release.version}`).pipe(
+          Effect.andThen(
+            installReleaseArchive(
+              {
+                version: release.version,
+                url: `https://github.com/${upstreamRepository}/releases/download/v${release.version}/${releaseAssetName(release.version)}`,
+                sha256: release.sha256,
+              },
+              path.join(output, release.channel),
+            ),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    );
   }),
 ).pipe(Command.withDescription("Download the T3 Code web apps bundled into the container."));
 
