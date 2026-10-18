@@ -108,7 +108,7 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const secrets = yield* SecretEncryption;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const client = yield* HttpClient.HttpClient;
+  const client = HttpClient.filterStatusOk(yield* HttpClient.HttpClient);
   const installReleaseArchive = yield* makeReleaseArchiveInstaller;
   const bundledRoot = Option.getOrNull(config.t3codeWebBundledRoot);
   const staticRoot = Option.getOrNull(config.t3codeWebStaticRoot);
@@ -312,19 +312,18 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
     if (token !== null) {
       headers["authorization"] = `Bearer ${token}`;
     }
-    const response = yield* client
-      .get(releasesUrl, { headers })
-      .pipe(
-        Effect.catchTag("HttpClientError", () =>
-          Effect.fail(storageFailure("Could not check GitHub for T3 Code updates")),
+    const response = yield* client.get(releasesUrl, { headers }).pipe(
+      Effect.catchTag("HttpClientError", (error) =>
+        Effect.fail(
+          error.response === undefined
+            ? storageFailure("Could not check GitHub for T3 Code updates")
+            : new T3CodeWebFailure({
+                message: "GitHub did not return a T3 Code release",
+                status: error.response.status,
+              }),
         ),
-      );
-    if (response.status !== 200) {
-      return yield* new T3CodeWebFailure({
-        message: "GitHub did not return a T3 Code release",
-        status: response.status,
-      });
-    }
+      ),
+    );
     const body = yield* response.json.pipe(
       Effect.catchTag("HttpClientError", () =>
         Effect.fail(storageFailure("GitHub returned an invalid T3 Code release response")),

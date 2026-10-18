@@ -30,7 +30,7 @@ const failure = (message: string) => new T3CodeWebFailure({ message });
 export const makeReleaseArchiveInstaller = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const client = yield* HttpClient.HttpClient;
+  const client = HttpClient.filterStatusOk(yield* HttpClient.HttpClient);
 
   /** Downloads a CLI tarball and installs its web app into `target`, replacing what is there. */
   return Effect.fn("installReleaseArchive")(function* (
@@ -39,19 +39,18 @@ export const makeReleaseArchiveInstaller = Effect.gen(function* () {
   ) {
     const temporary = path.join(path.dirname(target), `.${path.basename(target)}`);
 
-    const response = yield* client
-      .get(release.url)
-      .pipe(
-        Effect.catchTag("HttpClientError", () =>
-          Effect.fail(failure("Could not download the T3 Code Web update")),
+    const response = yield* client.get(release.url).pipe(
+      Effect.catchTag("HttpClientError", (error) =>
+        Effect.fail(
+          error.response === undefined
+            ? failure("Could not download the T3 Code Web update")
+            : new T3CodeWebFailure({
+                message: "GitHub did not return the T3 Code Web update",
+                status: error.response.status,
+              }),
         ),
-      );
-    if (response.status !== 200) {
-      return yield* new T3CodeWebFailure({
-        message: "GitHub did not return the T3 Code Web update",
-        status: response.status,
-      });
-    }
+      ),
+    );
 
     const install = Effect.gen(function* () {
       yield* fs.remove(temporary, { recursive: true, force: true });
