@@ -537,8 +537,23 @@ const T3SessionTokenClaims = Schema.fromJsonString(
 );
 
 /** Pairing scopes T3 Code requires before it approves an MCP client with the given access. */
-export const mcpClientScopes = (access: McpAccess) =>
-  access === "read-only" ? ["orchestration:read"] : ["orchestration:read", "orchestration:operate"];
+export const mcpClientScopes = (access: McpAccess) => {
+  switch (access) {
+    case "read-only":
+      return ["orchestration:read"];
+    case "full-access":
+      return [
+        "orchestration:read",
+        "orchestration:operate",
+        "settings:write",
+        "source-control:write",
+      ];
+    case "approval-required":
+    case "auto-accept-edits":
+    case "auto":
+      return ["orchestration:read", "orchestration:operate"];
+  }
+};
 
 const decodeEnvironmentJson = <S extends Schema.Top & { readonly DecodingServices: never }>(
   schema: S,
