@@ -1,5 +1,11 @@
 # @t3code-gateway/web
 
+## 0.7.3
+
+### Patch Changes
+
+- @t3code-gateway/contracts@0.7.3
+
 ## 0.7.2
 
 ### Patch Changes

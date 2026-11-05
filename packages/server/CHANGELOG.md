@@ -1,5 +1,18 @@
 # @t3code-gateway/server
 
+## 0.7.3
+
+### Patch Changes
+
+- 0acd0eb: Serve relayed MCP tools from a stale-while-revalidate cache so an unavailable environment never
+  blocks tool discovery. Successful listings refresh daily in the background, while failures retain
+  stale tools and retry after five minutes.
+- b4b1e09: Update dependency @modelcontextprotocol/sdk to v1.32.2
+- edc1849: Update bundled t3 code web nightly to v0.1.8-nightly.20261104.4192
+- 2c609be: Update bundled t3 code web stable to v0.1.7
+- ca38f55: Update dependency traefik/traefik to v3.7.17
+- @t3code-gateway/contracts@0.7.3
+
 ## 0.7.2
 
 ### Patch Changes
