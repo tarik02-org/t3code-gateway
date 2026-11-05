@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Setup Docker Buildx
-      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Download bundled T3 Code versions
       shell: bash
@@ -28,7 +28,7 @@ runs:
 
     - name: Build PR container artifact
       if: inputs.artifact-kind == 'pr'
-      uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
+      uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
       env:
         IMAGE: t3code-gateway
         VERSION: ${{ inputs.version }}
@@ -41,7 +41,7 @@ runs:
 
     - name: Upload PR container artifact
       if: inputs.artifact-kind == 'pr'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ inputs.artifact-name }}
         path: pr-image.tar
@@ -50,7 +50,7 @@ runs:
 
     - name: Upload release runtime
       if: inputs.artifact-kind == 'release'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ inputs.artifact-name }}
         path: packaging/runtime/app
