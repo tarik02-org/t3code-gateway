@@ -164,6 +164,9 @@ settings:
 
 catalogs:
   default:
+    '@effect/sql-sqlite-node':
+      specifier: 4.0.5
+      version: 4.0.5
     '@effect/tsgo':
       specifier: 0.53.4
       version: 0.53.4
@@ -262,6 +265,9 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1)
+      '@effect/sql-sqlite-node':
+        specifier: 'catalog:'
+        version: 4.0.5(effect@4.0.5)
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.2(zod@4.6.7)
@@ -270,7 +276,7 @@ importers:
         version: link:../contracts
       drizzle-orm:
         specifier: 1.0.0-rc.5
-        version: 1.0.0-rc.5(effect@4.0.5)(zod@4.6.7)
+        version: 1.0.0-rc.5(@effect/sql-sqlite-node@4.0.5(effect@4.0.5))(effect@4.0.5)(zod@4.6.7)
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -286,7 +292,7 @@ importers:
         version: 24.19.2
       drizzle-kit:
         specifier: 1.0.0-rc.5
-        version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(effect@4.0.5)(zod@4.6.7))
+        version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@effect/sql-sqlite-node@4.0.5(effect@4.0.5))(effect@4.0.5)(zod@4.6.7))
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -551,6 +557,11 @@ packages:
     peerDependencies:
       effect: 4.0.5
       redis: '>=5.0.0 <7.0.0'
+
+  '@effect/sql-sqlite-node@4.0.5':
+    resolution: {integrity: sha512-SHza5qNwiI4dRtUk45wvUfvZq7vB950DW2wD6npzt2aH/tesFfPlZJSDBIvwhazoK+gvDknBOONfKyFZsIF+tg==}
+    peerDependencies:
+      effect: 4.0.5
 
   '@effect/tsgo-darwin-arm64@0.53.4':
     resolution: {integrity: sha512-NVU043pBMzheL+IYoG13emaYqZTzrTGwhLZ2tXScqLCBWPwXc0SB1zt038v4/WW3aHF+MbIHwTKTPi/bcpwo5g==}
@@ -4019,6 +4030,10 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@effect/sql-sqlite-node@4.0.5(effect@4.0.5)':
+    dependencies:
+      effect: 4.0.5
+
   '@effect/tsgo-darwin-arm64@0.53.4':
     optional: true
 
@@ -5820,12 +5835,13 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  drizzle-kit@1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(effect@4.0.5)(zod@4.6.7)):
+  drizzle-kit@1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@effect/sql-sqlite-node@4.0.5(effect@4.0.5))(effect@4.0.5)(zod@4.6.7)):
     optionalDependencies:
-      drizzle-orm: 1.0.0-rc.5(effect@4.0.5)(zod@4.6.7)
+      drizzle-orm: 1.0.0-rc.5(@effect/sql-sqlite-node@4.0.5(effect@4.0.5))(effect@4.0.5)(zod@4.6.7)
 
-  drizzle-orm@1.0.0-rc.5(effect@4.0.5)(zod@4.6.7):
+  drizzle-orm@1.0.0-rc.5(@effect/sql-sqlite-node@4.0.5(effect@4.0.5))(effect@4.0.5)(zod@4.6.7):
     optionalDependencies:
+      '@effect/sql-sqlite-node': 4.0.5(effect@4.0.5)
       effect: 4.0.5
       zod: 4.6.7
 
