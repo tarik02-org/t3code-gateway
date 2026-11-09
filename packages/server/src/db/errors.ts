@@ -6,6 +6,7 @@ import type * as SqlError from "effect/sql/SqlError";
 
 const DatabaseOperation = Schema.Literals([
   "ensureDirectory",
+  "open",
   "migrate",
   "bootstrapUser",
   "authSession",
@@ -38,6 +39,9 @@ type DatabaseFailureReason = typeof DatabaseFailureReason.Type;
 const databaseMessage = (operation: DatabaseOperation, reason: DatabaseFailureReason) => {
   if (operation === "ensureDirectory") {
     return `Database directory setup failed: ${reason}`;
+  }
+  if (operation === "open") {
+    return `Opening the database failed: ${reason}`;
   }
   if (operation === "migrate") {
     return `Database migration failed: ${reason}`;
@@ -136,3 +140,15 @@ export const migrationError = {
       }),
     ),
 };
+
+export const openError = (path: string) => ({
+  SqlError: (error: SqlError.SqlError) =>
+    Effect.fail(
+      new DatabaseError({
+        operation: "open",
+        reason: reasonFromSqlError(error),
+        path,
+        cause: error,
+      }),
+    ),
+});
