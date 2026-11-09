@@ -1,5 +1,21 @@
 # @t3code-gateway/server
 
+## 0.7.4
+
+### Patch Changes
+
+- c3c5e89: Update drizzle to v1.0.0-rc.5 and use its built-in Effect `node:sqlite` driver instead of the local one. The
+  local drizzle-orm patch is gone, since its Effect 4 fixes are now upstream. The database now runs in WAL mode
+  with a 5-second busy timeout.
+- 0e098ac: Stop rotating MCP OAuth refresh tokens. A refresh now returns a new access token and the same
+  refresh token, which stays valid until its original 90-day expiry or revocation, so a client that
+  loses a refresh reply can retry instead of being signed out.
+- 0beda70: Update bundled t3 code web nightly to v0.1.8-nightly.20261109.4392
+- 6e121ea: Update dependencies: refresh the lockfile (Tailwind CSS 4.3.5 and other in-range updates), move the
+  container image to Node 24.22.2, and update GitHub Actions. `@effect/platform-node-shared` is now pinned
+  to the Effect release so lockfile refreshes cannot pull a build that needs a newer Effect.
+- @t3code-gateway/contracts@0.7.4
+
 ## 0.7.3
 
 ### Patch Changes
