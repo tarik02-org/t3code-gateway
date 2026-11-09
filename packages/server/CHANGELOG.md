@@ -1,5 +1,65 @@
 # @t3code-gateway/server
 
+## 0.7.3
+
+### Patch Changes
+
+- 0acd0eb: Serve relayed MCP tools from a stale-while-revalidate cache so an unavailable environment never
+  blocks tool discovery. Successful listings refresh daily in the background, while failures retain
+  stale tools and retry after five minutes.
+- b4b1e09: Update dependency @modelcontextprotocol/sdk to v1.32.2
+- edc1849: Update bundled t3 code web nightly to v0.1.8-nightly.20261104.4192
+- 2c609be: Update bundled t3 code web stable to v0.1.7
+- ca38f55: Update dependency traefik/traefik to v3.7.17
+- @t3code-gateway/contracts@0.7.3
+
+## 0.7.2
+
+### Patch Changes
+
+- a5d8e25: Serve the hosted T3 Code web app again. The `client/` in upstream's CLI tarballs expects to be
+  served by the T3 Code server and failed with "Primary environment request failed during
+  fetch-session-state (HTTP 404)". The gateway now downloads `T3-Code-Web-<version>.zip` from
+  `tarik02-org/t3code-web-builds`, which builds upstream's hosted web app from each release. Builds
+  downloaded from earlier sources are removed on startup.
+- @t3code-gateway/contracts@0.7.2
+
+## 0.7.1
+
+### Patch Changes
+
+- b35e20a: Build the image on Node 24.22.0. The Alpine 3.24 update left the image on `node:24.13.1-alpine3.24`,
+  which doesn't exist, so the 0.7.0 image never published.
+- @t3code-gateway/contracts@0.7.1
+
+## 0.7.0
+
+### Minor Changes
+
+- 7608652: Take T3 Code Web from upstream `pingdotgg/t3code` instead of the `tarik02-org/t3code` fork. The
+  gateway now unpacks the web app from the release's `t3-<version>-linux-x64.tar.gz` CLI tarball and
+  checks it against the SHA-256 digest GitHub reports. On startup it deletes builds downloaded from
+  the fork, whose calendar versions would outrank upstream's, and clears pins to versions that are no
+  longer installed.
+
+### Patch Changes
+
+- 604796f: Run on stable Effect 4 instead of the 4.0 betas.
+- 3ffc569: Request `settings:write` and `source-control:write` with the pairing code that signs the MCP relay in
+  with full access. T3 Code now requires them for full-access MCP clients and refused the approval,
+  using the code up.
+- 0af1b7b: Accept any environment slug on relayed MCP tools instead of an enum. The enum listed only the
+  environments whose tool listing succeeded, so a model couldn't call the others.
+- 65ad4ec: Update alpine docker tag to v3.24
+- b31c994: Update docker/dockerfile docker tag to v1.28
+- b05cf98: Update dependency just-containers/s6-overlay to v3.2.3.2
+- 3346ba2: Update dependency lucide-react to v1
+- 98b27e2: Update react monorepo to v19.3.1
+- 583858d: Update dependency @tanstack/react-query to v5.104.4
+- df9580e: Update tanstack-router monorepo
+- 13c0c98: Update dependency traefik/traefik to v3.7.15
+- @t3code-gateway/contracts@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

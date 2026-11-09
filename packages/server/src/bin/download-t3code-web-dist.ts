@@ -11,21 +11,21 @@ import * as Flag from "effect/cli/Flag";
 import {
   makeReleaseArchiveInstaller,
   releaseAssetName,
-  upstreamRepository,
+  webBuildsRepository,
 } from "../t3code-web/release-archive.ts";
 
 const bundledReleases = [
   {
     channel: "stable",
-    // renovate: datasource=github-release-attachments depName=t3code-web-stable packageName=pingdotgg/t3code
-    tag: "v0.1.0",
-    sha256: "f7703ff1bb8f6243580058b3ccf2c02abb62eba4b991e26bbb1da22f4b56d9b1",
+    // renovate: datasource=github-release-attachments depName=t3code-web-stable packageName=tarik02-org/t3code-web-builds
+    tag: "v0.1.7",
+    sha256: "93201576f7cdddceb1e704362fc2a989a3dd3c51498b26258401626200d8efca",
   },
   {
     channel: "nightly",
-    // renovate: datasource=github-release-attachments depName=t3code-web-nightly packageName=pingdotgg/t3code
-    tag: "v0.1.1-nightly.20261018.3302",
-    sha256: "a049e8dc5eff84e25850713c728195a84f20394ef729e8342cc69eb733440023",
+    // renovate: datasource=github-release-attachments depName=t3code-web-nightly packageName=tarik02-org/t3code-web-builds
+    tag: "v0.1.8-nightly.20261109.4392",
+    sha256: "501664947867e9a3631bbce7379818d49f82bfd248c9b92d0d47e7668aa672d7",
   },
 ] as const;
 
@@ -52,7 +52,7 @@ const command = Command.make(
         yield* installReleaseArchive(
           {
             version,
-            url: `https://github.com/${upstreamRepository}/releases/download/${release.tag}/${releaseAssetName(version)}`,
+            url: `https://github.com/${webBuildsRepository}/releases/download/${release.tag}/${releaseAssetName(version)}`,
             sha256: release.sha256,
           },
           path.join(output, release.channel),

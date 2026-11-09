@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.28
 
 ARG ALPINE_VERSION=3.24
-ARG NODE_VERSION=24.13.1
+ARG NODE_VERSION=24.22.2
 
 FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS node-runtime
 
@@ -11,7 +11,7 @@ ARG TARGETARCH
 # renovate: datasource=github-releases depName=just-containers/s6-overlay versioning=loose
 ARG S6_OVERLAY_VERSION=3.2.3.2
 # renovate: datasource=github-releases depName=traefik/traefik
-ARG TRAEFIK_VERSION=3.7.15
+ARG TRAEFIK_VERSION=3.7.17
 
 RUN apk add --no-cache curl xz
 

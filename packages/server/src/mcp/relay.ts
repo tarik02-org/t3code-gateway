@@ -16,7 +16,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import * as Cause from "effect/Cause";
-import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -24,6 +23,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
+import * as Clock from "effect/Clock";
 import * as HttpBody from "effect/http/HttpBody";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
@@ -37,7 +37,9 @@ import { McpUpstreamCredentials } from "./upstream-credentials.ts";
 const ENVIRONMENT_ARGUMENT = "environment";
 const MCP_ACCESS_LEVELS = McpAccess.literals;
 const LIST_ENVIRONMENTS_TOOL = "gateway_list_environments";
-const TOOL_CACHE_TTL_MS = 60_000;
+const TOOL_CACHE_REVALIDATE_MS = 24 * 60 * 60 * 1_000;
+const TOOL_CACHE_UNAVAILABLE_RETRY_MS = 5 * 60 * 1_000;
+const UPSTREAM_TOOL_DISCOVERY_TIMEOUT_MS = 10_000;
 // `t3_thread_wait` holds a call open for as long as the agent asks; the agent's own client bounds it.
 const UPSTREAM_CALL_TIMEOUT_MS = 60 * 60 * 1_000;
 
@@ -189,7 +191,9 @@ const closeIfIdle = (pooled: PooledClient) => {
 
 interface CachedTools {
   readonly tools: ReadonlyArray<Tool>;
-  readonly fetchedAt: number;
+  readonly availability: "available" | "unavailable";
+  readonly revalidateAfter: number;
+  refreshing: boolean;
 }
 
 // No slug enum: it would leave out every environment whose tool listing failed and go stale as
@@ -257,6 +261,7 @@ export const make = Effect.gen(function* () {
   };
 
   const connect = async (environment: EnvironmentRow, access: McpAccess) => {
+    let connecting = true;
     const transport = new StreamableHTTPClientTransport(
       new URL(joinBaseUrl(environment.endpoint, "/mcp")),
       {
@@ -265,8 +270,16 @@ export const make = Effect.gen(function* () {
           const token = await runToken(credentials.ensure(environment.environmentId, access));
           const headers = new Headers(init?.headers);
           headers.set("authorization", `Bearer ${token}`);
+          const requestInit: RequestInit = { ...init, headers };
+          if (connecting) {
+            const signals = [AbortSignal.timeout(UPSTREAM_TOOL_DISCOVERY_TIMEOUT_MS)];
+            if (init?.signal != null) {
+              signals.push(init.signal);
+            }
+            requestInit.signal = AbortSignal.any(signals);
+          }
           // @effect-diagnostics-next-line globalFetch:off -- the SDK transport takes a fetch function.
-          const response = await fetch(url, { ...init, headers });
+          const response = await fetch(url, requestInit);
           if (response.status === 401) {
             await run(
               credentials
@@ -280,7 +293,11 @@ export const make = Effect.gen(function* () {
     );
     const client = new Client({ name: "t3code-gateway", version: GATEWAY_VERSION });
     // The SDK's own transport declares `sessionId?: string`, which `exactOptionalPropertyTypes` rejects for `Transport`.
-    await client.connect(transport as Transport);
+    try {
+      await client.connect(transport as Transport);
+    } finally {
+      connecting = false;
+    }
     return client;
   };
 
@@ -309,8 +326,8 @@ export const make = Effect.gen(function* () {
     return pooled;
   };
 
-  /** Closes clients of environments that were removed, disabled or moved to another endpoint. */
-  const pruneClients = (rows: ReadonlyArray<EnvironmentRow>) => {
+  /** Drops state for environments that were removed, disabled or moved to another endpoint. */
+  const pruneUpstreams = (rows: ReadonlyArray<EnvironmentRow>) => {
     const live = new Set(
       rows
         .filter((row) => row.enabled && row.mcpEnabled)
@@ -319,6 +336,11 @@ export const make = Effect.gen(function* () {
     for (const [key, pooled] of upstreamClients) {
       if (!live.has(key)) {
         evict(key, pooled);
+      }
+    }
+    for (const key of toolCache.keys()) {
+      if (!live.has(key)) {
+        toolCache.delete(key);
       }
     }
   };
@@ -361,7 +383,7 @@ export const make = Effect.gen(function* () {
 
   const callerEnvironments = (caller: McpCaller) =>
     environments.listEnvironments.pipe(
-      Effect.tap((rows) => Effect.sync(() => pruneClients(rows))),
+      Effect.tap((rows) => Effect.sync(() => pruneUpstreams(rows))),
       Effect.map((rows) =>
         rows.filter(
           (row) =>
@@ -375,46 +397,83 @@ export const make = Effect.gen(function* () {
       ),
     );
 
+  const fetchEnvironmentTools = (environment: EnvironmentRow, access: McpAccess) =>
+    withUpstream(environment, access, async (client) => {
+      const tools: Array<Tool> = [];
+      let cursor: string | undefined;
+      do {
+        const page = await client.listTools(cursor === undefined ? {} : { cursor }, {
+          timeout: UPSTREAM_TOOL_DISCOVERY_TIMEOUT_MS,
+        });
+        tools.push(...page.tools);
+        cursor = page.nextCursor;
+      } while (cursor !== undefined);
+      return tools;
+    });
+
+  const revalidateEnvironmentTools = (
+    environment: EnvironmentRow,
+    access: McpAccess,
+    cacheKey: string,
+    cached: CachedTools,
+  ) => {
+    cached.refreshing = true;
+    void runExit(fetchEnvironmentTools(environment, access)).then(async (exit) => {
+      if (toolCache.get(cacheKey) !== cached) {
+        return;
+      }
+      const now = await run(Clock.currentTimeMillis);
+      if (Exit.isSuccess(exit)) {
+        toolCache.set(cacheKey, {
+          tools: exit.value,
+          availability: "available",
+          revalidateAfter: now + TOOL_CACHE_REVALIDATE_MS,
+          refreshing: false,
+        });
+        return;
+      }
+      toolCache.set(cacheKey, {
+        tools: cached.tools,
+        availability: "unavailable",
+        revalidateAfter: now + TOOL_CACHE_UNAVAILABLE_RETRY_MS,
+        refreshing: false,
+      });
+      void run(
+        Effect.logWarning("Could not revalidate MCP tools of environment").pipe(
+          Effect.annotateLogs({
+            environmentId: environment.environmentId,
+            reason: failureMessage(exit.cause),
+          }),
+        ),
+      );
+    });
+  };
+
   const environmentTools = (environment: EnvironmentRow, access: McpAccess) =>
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
       const cacheKey = clientKey(environment, access);
-      const cached = toolCache.get(cacheKey);
-      if (cached !== undefined && now - cached.fetchedAt < TOOL_CACHE_TTL_MS) {
-        return cached.tools;
+      let cached = toolCache.get(cacheKey);
+      if (cached === undefined) {
+        cached = {
+          tools: [],
+          availability: "unavailable",
+          revalidateAfter: now,
+          refreshing: false,
+        };
+        toolCache.set(cacheKey, cached);
       }
-      const tools = yield* withUpstream(environment, access, async (client) => {
-        const tools: Array<Tool> = [];
-        let cursor: string | undefined;
-        do {
-          const page = await client.listTools(cursor === undefined ? {} : { cursor });
-          tools.push(...page.tools);
-          cursor = page.nextCursor;
-        } while (cursor !== undefined);
-        return tools;
-      });
-      toolCache.set(cacheKey, { tools, fetchedAt: now });
-      return tools;
+      if (!cached.refreshing && now >= cached.revalidateAfter) {
+        revalidateEnvironmentTools(environment, access, cacheKey, cached);
+      }
+      return cached.tools;
     });
 
   const listTools = (caller: McpCaller) =>
     Effect.gen(function* () {
       const reachable = yield* callerEnvironments(caller);
-      const listed = yield* Effect.forEach(
-        reachable,
-        (environment) =>
-          environmentTools(environment, caller.access).pipe(
-            Effect.catch((cause) =>
-              Effect.logWarning("Could not list MCP tools of environment").pipe(
-                Effect.annotateLogs({
-                  environmentId: environment.environmentId,
-                  reason: cause.message,
-                }),
-                Effect.as<ReadonlyArray<Tool>>([]),
-              ),
-            ),
-          ),
-        { concurrency: "unbounded" },
+      const listed = yield* Effect.forEach(reachable, (environment) =>
+        environmentTools(environment, caller.access),
       );
 
       const byName = new Map<string, Tool>();

@@ -1,6 +1,6 @@
 {
   "name": "@t3code-gateway/server",
-  "version": "0.6.0",
+  "version": "0.7.3",
   "private": true,
   "type": "module",
   "exports": {
@@ -19,7 +19,7 @@
     "@t3code-gateway/contracts": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
     "effect": "catalog:",
-    "tar": "^7.5.22",
+    "fflate": "^0.8.3",
     "yaml": "catalog:"
   },
   "devDependencies": {

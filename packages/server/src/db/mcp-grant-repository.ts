@@ -27,11 +27,6 @@ export class McpGrantRepository extends Context.Service<
       tokenHash: string,
       now: string,
     ) => Effect.Effect<McpGrantRow | undefined, DatabaseError>;
-    /** Swaps a used refresh token for new tokens; `false` when it was already used. */
-    readonly rotateTokens: (
-      usedTokenHash: string,
-      tokens: ReadonlyArray<CreateMcpTokenInput>,
-    ) => Effect.Effect<boolean, DatabaseError>;
     readonly addToken: (token: CreateMcpTokenInput) => Effect.Effect<void, DatabaseError>;
     readonly deleteToken: (tokenHash: string) => Effect.Effect<void, DatabaseError>;
     readonly deleteGrant: (grantId: string) => Effect.Effect<boolean, DatabaseError>;
@@ -95,26 +90,6 @@ export const make = Effect.gen(function* () {
         )
         .get()
         .pipe(Effect.map((row) => row?.grant)),
-    );
-
-  const rotateTokens = (usedTokenHash: string, tokens: ReadonlyArray<CreateMcpTokenInput>) =>
-    catchQuery(
-      db.transaction((tx) =>
-        Effect.gen(function* () {
-          const used = yield* tx
-            .delete(mcpTokens)
-            .where(and(eq(mcpTokens.tokenHash, usedTokenHash), eq(mcpTokens.kind, "refresh")))
-            .run();
-          if (used.changes === 0) {
-            return false;
-          }
-          yield* tx
-            .insert(mcpTokens)
-            .values([...tokens])
-            .run();
-          return true;
-        }),
-      ),
     );
 
   const addToken = (token: CreateMcpTokenInput) =>
@@ -182,7 +157,6 @@ export const make = Effect.gen(function* () {
     findGrant,
     createGrant,
     findGrantByRefreshTokenHash,
-    rotateTokens,
     addToken,
     deleteToken,
     deleteGrant,

@@ -112,9 +112,12 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   const installReleaseArchive = yield* makeReleaseArchiveInstaller;
   const bundledRoot = Option.getOrNull(config.t3codeWebBundledRoot);
   const staticRoot = Option.getOrNull(config.t3codeWebStaticRoot);
-  const downloadedRoot = path.join(config.t3codeWebDataRoot, "releases");
-  // Builds of the former tarik02-org/t3code fork; their calendar versions outrank upstream's.
-  const legacyDownloadedRoot = path.join(config.t3codeWebDataRoot, "versions");
+  const downloadedRoot = path.join(config.t3codeWebDataRoot, "hosted");
+  // Earlier download sources: "versions" holds fork builds, whose calendar versions outrank
+  // upstream's; "releases" holds CLI-tarball builds, which need a T3 Code server to serve them.
+  const legacyDownloadedRoots = ["versions", "releases"].map((name) =>
+    path.join(config.t3codeWebDataRoot, name),
+  );
 
   const downloadedChannelRoot = (channel: T3CodeWebChannel) => path.join(downloadedRoot, channel);
   const bundledChannelRoot = (channel: T3CodeWebChannel) =>
@@ -256,7 +259,9 @@ const makeT3CodeWebService = Effect.fn("makeT3CodeWebService")(function* () {
   });
 
   const initialize = Effect.fn("T3CodeWebService.initialize")(function* () {
-    yield* fs.remove(legacyDownloadedRoot, { recursive: true, force: true });
+    for (const legacyRoot of legacyDownloadedRoots) {
+      yield* fs.remove(legacyRoot, { recursive: true, force: true });
+    }
     yield* fs.makeDirectory(downloadedRoot, { recursive: true });
     const current = yield* readSettings;
     const active = yield* activeTarget().pipe(
