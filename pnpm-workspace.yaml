@@ -3,6 +3,8 @@ packages:
 
 catalog:
   "@effect/platform-node": 4.0.5
+  # @effect/platform-node takes any ^4 shared build; newer ones import modules this effect lacks.
+  "@effect/platform-node-shared": 4.0.5
   "@effect/tsgo": 0.53.4
   "@tanstack/react-query": 5.104.4
   "@tanstack/react-router": 1.170.45
@@ -20,6 +22,7 @@ catalog:
 
 overrides:
   "@effect/platform-node": "catalog:"
+  "@effect/platform-node-shared": "catalog:"
   "@types/node": "catalog:"
   effect: "catalog:"
   vite: "catalog:"
