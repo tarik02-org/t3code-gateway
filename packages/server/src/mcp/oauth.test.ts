@@ -1,7 +1,8 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as ConfigProvider from "effect/ConfigProvider";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
@@ -45,7 +46,11 @@ const testLayer = oauthLayer.pipe(
 );
 
 const run = <A, E>(
-  effect: Effect.Effect<A, E, McpOAuth | McpGrants | GatewayDatabase | Crypto.Crypto>,
+  effect: Effect.Effect<
+    A,
+    E,
+    McpOAuth | McpGrants | GatewayDatabase | SecureRandom.SecureRandom | Digest.Digest
+  >,
 ) =>
   Effect.runPromise(
     Effect.gen(function* () {
@@ -57,10 +62,11 @@ const run = <A, E>(
 /** Registers a client and walks it through the authorization code flow. */
 const signIn = Effect.gen(function* () {
   const oauth = yield* McpOAuth;
-  const crypto = yield* Crypto.Crypto;
-  const verifier = Base64Url.encode(yield* crypto.randomBytes(32));
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
+  const verifier = Base64Url.encode(yield* random.randomBytes(32));
   const challenge = Base64Url.encode(
-    yield* crypto.digest("SHA-256", new TextEncoder().encode(verifier)),
+    yield* digests.digest(Digest.sha256, new TextEncoder().encode(verifier)),
   );
   const client = yield* oauth.register({ redirect_uris: ["http://127.0.0.1/callback"] });
   const authorization = yield* oauth.validateAuthorization(urls, {

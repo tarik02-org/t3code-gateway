@@ -1,7 +1,7 @@
 import type { EnvironmentRecord, TraefikConfigResponse } from "@t3code-gateway/contracts/schemas";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
 import * as FileSystem from "effect/FileSystem";
@@ -53,7 +53,7 @@ const traefikWriteFailureReason = (error: { readonly reason: { readonly _tag: st
 const makeTraefikReconciler = Effect.gen(function* () {
   const config = yield* GatewayRuntimeConfig;
   const environments = yield* EnvironmentService;
-  const crypto = yield* Crypto.Crypto;
+  const digests = yield* Digest.Digest;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const lock = yield* Semaphore.make(1);
@@ -70,7 +70,7 @@ const makeTraefikReconciler = Effect.gen(function* () {
       if (content === null) {
         return undefined;
       }
-      const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(content));
+      const digest = yield* digests.digest(Digest.sha256, new TextEncoder().encode(content));
       return Hex.encode(digest);
     });
 
@@ -127,7 +127,7 @@ const makeTraefikReconciler = Effect.gen(function* () {
         }
 
         const nextHash = Hex.encode(
-          yield* crypto.digest("SHA-256", new TextEncoder().encode(yaml)),
+          yield* digests.digest(Digest.sha256, new TextEncoder().encode(yaml)),
         );
         const existingHash = yield* readFileHash(dynamicFile);
         if (existingHash === nextHash) {

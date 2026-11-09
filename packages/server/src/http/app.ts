@@ -4,6 +4,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -19,6 +20,7 @@ import { configLayer, GatewayRuntimeConfig } from "../config.ts";
 import { GatewayDatabase, layer as gatewayDatabaseLayer } from "../db/database.ts";
 import { layer as authRepositoryLayer } from "../db/auth-repository.ts";
 import { layer as environmentRepositoryLayer } from "../db/environment-repository.ts";
+import { layer as environmentClientSessionRepositoryLayer } from "../db/environment-client-session-repository.ts";
 import { layer as mcpUpstreamCredentialRepositoryLayer } from "../db/mcp-upstream-credential-repository.ts";
 import { layer as mcpGrantRepositoryLayer } from "../db/mcp-grant-repository.ts";
 import { layer as mcpGrantsLayer } from "../mcp/grants.ts";
@@ -31,6 +33,10 @@ import {
   AdminTokenRotation,
   AdminTokenRotationLive,
 } from "../environments/admin-token-rotation.ts";
+import {
+  EnvironmentClientSessions,
+  layer as environmentClientSessionsLayer,
+} from "../environments/client-sessions.ts";
 import { ADMIN_TOKEN_SWEEP_INTERVAL } from "../environments/constants.ts";
 import { layer as environmentServiceLayer } from "../environments/service.ts";
 import {
@@ -80,6 +86,14 @@ const adminTokenRotationLiveLayer = AdminTokenRotationLive.pipe(
   Layer.provide(foundationLayer),
 );
 
+const environmentClientSessionsLiveLayer = environmentClientSessionsLayer.pipe(
+  Layer.provide(adminTokenRotationLiveLayer),
+  Layer.provide(environmentClientSessionRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
+  Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(NodeSocket.layerWebSocketConstructor),
+  Layer.provide(environmentRepositoryLiveLayer),
+);
+
 const mcpUpstreamCredentialsLiveLayer = mcpUpstreamCredentialsLayer.pipe(
   Layer.provide(adminTokenRotationLiveLayer),
   Layer.provide(mcpUpstreamCredentialRepositoryLayer.pipe(Layer.provide(databaseLiveLayer))),
@@ -109,6 +123,7 @@ const mcpRelayLiveLayer = mcpRelayLayer.pipe(
 );
 
 const environmentLiveLayer = environmentServiceLayer.pipe(
+  Layer.provide(environmentClientSessionsLiveLayer),
   Layer.provide(mcpUpstreamCredentialsLiveLayer),
   Layer.provide(adminTokenRotationLiveLayer),
   Layer.provide(secretLiveLayer),
@@ -162,12 +177,15 @@ const bootstrapLayer = Layer.effectDiscard(
       Effect.repeat(Schedule.spaced(ADMIN_TOKEN_SWEEP_INTERVAL)),
       Effect.forkScoped({ startImmediately: true }),
     );
+    const clientSessions = yield* EnvironmentClientSessions;
+    yield* clientSessions.run;
   }),
 ).pipe(
   Layer.provide(traefikLiveLayer),
   Layer.provide(authLiveLayer),
   Layer.provide(adminTokenRotationLiveLayer),
   Layer.provide(mcpUpstreamCredentialsLiveLayer),
+  Layer.provide(environmentClientSessionsLiveLayer),
 );
 
 const gatewayRpcLayer = RpcServer.layerHttp({
