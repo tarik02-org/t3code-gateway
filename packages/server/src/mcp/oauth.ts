@@ -238,6 +238,14 @@ export const redirectForError = (error: McpOAuthRedirectError, urls: McpOAuthUrl
 const tokenError = (error: McpOAuthTokenError["error"], description: string) =>
   Effect.fail(new McpOAuthTokenError({ error, description }));
 
+const tokenResponse = (accessToken: string, refreshToken: string) => ({
+  access_token: accessToken,
+  token_type: "Bearer" as const,
+  expires_in: ACCESS_TOKEN_TTL_SECONDS,
+  refresh_token: refreshToken,
+  scope: SCOPE,
+});
+
 const platformFailure = (error: PlatformError.PlatformError) =>
   Effect.fail(new DatabaseError({ operation: "mcpGrant", reason: "unknown", cause: error }));
 
@@ -438,40 +446,43 @@ export const make = Effect.gen(function* () {
       });
     });
 
+  const issueAccessToken = (grantId: string, now: DateTime.Utc) =>
+    createBearerToken.pipe(
+      Effect.map(({ token, tokenHash }) => ({
+        token,
+        row: {
+          tokenHash,
+          grantId,
+          kind: "access" as const,
+          expiresAt: DateTime.formatIso(DateTime.add(now, { seconds: ACCESS_TOKEN_TTL_SECONDS })),
+          createdAt: DateTime.formatIso(now),
+        },
+      })),
+      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.catchTags({ PlatformError: platformFailure }),
+    );
+
   const issueTokens = (grantId: string, now: DateTime.Utc) =>
     Effect.gen(function* () {
-      const access = yield* createBearerToken;
-      const refresh = yield* createBearerToken;
-      const createdAt = DateTime.formatIso(now);
+      const access = yield* issueAccessToken(grantId, now);
+      const refresh = yield* createBearerToken.pipe(
+        Effect.provideService(Crypto.Crypto, crypto),
+        Effect.catchTags({ PlatformError: platformFailure }),
+      );
       return {
         rows: [
-          {
-            tokenHash: access.tokenHash,
-            grantId,
-            kind: "access" as const,
-            expiresAt: DateTime.formatIso(DateTime.add(now, { seconds: ACCESS_TOKEN_TTL_SECONDS })),
-            createdAt,
-          },
+          access.row,
           {
             tokenHash: refresh.tokenHash,
             grantId,
             kind: "refresh" as const,
             expiresAt: DateTime.formatIso(DateTime.add(now, { days: REFRESH_TOKEN_TTL_DAYS })),
-            createdAt,
+            createdAt: DateTime.formatIso(now),
           },
         ],
-        response: {
-          access_token: access.token,
-          token_type: "Bearer" as const,
-          expires_in: ACCESS_TOKEN_TTL_SECONDS,
-          refresh_token: refresh.token,
-          scope: SCOPE,
-        },
+        response: tokenResponse(access.token, refresh.token),
       };
-    }).pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-      Effect.catchTags({ PlatformError: platformFailure }),
-    );
+    });
 
   const exchangeCode = (urls: McpOAuthUrls, request: McpTokenRequest) =>
     Effect.gen(function* () {
@@ -553,12 +564,10 @@ export const make = Effect.gen(function* () {
       if (grant === undefined || grant.clientId !== request.client_id) {
         return yield* tokenError("invalid_grant", "The refresh token is invalid or expired");
       }
-      const tokens = yield* issueTokens(grant.grantId, now);
-      const rotated = yield* grantRepository.rotateTokens(usedHash, tokens.rows);
-      if (!rotated) {
-        return yield* tokenError("invalid_grant", "The refresh token was already used");
-      }
-      return tokens.response;
+      // The refresh token is not rotated: a client that loses this reply must be able to retry it.
+      const access = yield* issueAccessToken(grant.grantId, now);
+      yield* grantRepository.addToken(access.row);
+      return tokenResponse(access.token, request.refresh_token);
     });
 
   const exchange = (urls: McpOAuthUrls, request: McpTokenRequest) => {
