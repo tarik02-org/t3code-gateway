@@ -57,7 +57,8 @@ jobs:
 
           if ! git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             git tag "${tag}"
-            git push origin "${tag}"
+            # changesets/action v2 no longer leaves git credentials behind, and checkout persists none.
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${tag}"
           fi
 
           if ! gh release view "${tag}" >/dev/null 2>&1; then
