@@ -33,9 +33,6 @@ packageExtensions:
     dependencies:
       vite: "catalog:"
 
-patchedDependencies:
-  drizzle-orm@1.0.0-rc.4: patches/drizzle-orm@1.0.0-rc.4.patch
-
 peerDependencyRules:
   allowAny:
     - vite

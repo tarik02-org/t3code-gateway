@@ -1,6 +1,7 @@
 import { DatabaseSync, type SQLInputValue, type StatementResultingChanges } from "node:sqlite";
 
 import { EffectCache, type EffectCacheShape } from "drizzle-orm/cache/core/cache-effect";
+import type { QueryMetadata } from "drizzle-orm/cache/core/types";
 import { DefaultServices } from "drizzle-orm/effect-core/defaults";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core/errors";
 import { EffectLogger, type EffectLoggerShape } from "drizzle-orm/effect-core/logger";
@@ -16,11 +17,7 @@ import {
   SQLiteEffectTransaction,
 } from "drizzle-orm/sqlite-core/effect/session";
 import type { EffectDrizzleSQLiteConfig } from "drizzle-orm/sqlite-core/effect/utils";
-import type {
-  PreparedQueryConfig,
-  SQLiteExecuteMethod,
-  SQLiteTransactionConfig,
-} from "drizzle-orm/sqlite-core/session";
+import type { PreparedQueryConfig, SQLiteExecuteMethod } from "drizzle-orm/sqlite-core/session";
 import * as Effect from "effect/Effect";
 import * as SqlError from "effect/sql/SqlError";
 
@@ -41,6 +38,7 @@ const asSqliteParams = (params: unknown[]): SQLInputValue[] => params as SQLInpu
 interface EffectNodeSqliteSessionOptions {
   readonly logger: EffectLoggerShape;
   readonly cache: EffectCacheShape;
+  readonly paramsInErrors: boolean | undefined;
 }
 
 class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEffectSession<
@@ -79,10 +77,7 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
     _prepare: boolean,
     executeMethod?: SQLiteExecuteMethod,
     mapper?: (rows: unknown[]) => unknown,
-    queryMetadata?: {
-      type: "select" | "update" | "delete" | "insert";
-      tables: string[];
-    },
+    queryMetadata?: QueryMetadata,
   ): SQLiteEffectPreparedQuery<T, EffectNodeSqliteQueryEffectHKT> {
     const statement = Effect.try({
       try: () => this.client.prepare(query.sql),
@@ -114,13 +109,6 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
               return row;
             }),
           ),
-        values: (params) =>
-          statement.pipe(
-            Effect.map((stmt) => {
-              stmt.setReturnArrays(true);
-              return stmt.all(...asSqliteParams(params));
-            }),
-          ),
         run: (params) =>
           statement.pipe(
             Effect.map((stmt) => {
@@ -136,6 +124,7 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
       this.options.cache,
       queryMetadata,
       undefined,
+      this.options.paramsInErrors,
     );
   }
 
@@ -147,12 +136,10 @@ class EffectNodeSqliteSession<TRelations extends AnyRelations> extends SQLiteEff
         TRelations
       >,
     ) => Effect.Effect<A, E, R>,
-    config: SQLiteTransactionConfig = {},
   ): Effect.Effect<A, E | SqlError.SqlError, R> {
     const tx = new EffectNodeSqliteTransaction(this.dialect, this, this.relations);
-    const begin = `begin${config.behavior ? ` ${config.behavior}` : ""}`;
 
-    return this.executeRaw(begin).pipe(
+    return this.executeRaw("begin").pipe(
       Effect.flatMap(() =>
         transaction(tx).pipe(
           Effect.tap(() => this.executeRaw("commit")),
@@ -235,7 +222,11 @@ export const make = <TRelations extends AnyRelations = EmptyRelations>(
     const logger = yield* EffectLogger;
     const dialect = new SQLiteDialect({ useJitMappers: config.jit === true });
     const relations = config.relations ?? ({} as TRelations);
-    const session = new EffectNodeSqliteSession(client, dialect, relations, { logger, cache });
+    const session = new EffectNodeSqliteSession(client, dialect, relations, {
+      logger,
+      cache,
+      paramsInErrors: config.paramsInErrors,
+    });
     const db = new EffectNodeSqliteDatabase(
       dialect,
       session,
