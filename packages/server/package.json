@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "build": "tsc --noEmit && vp pack",
+    "build": "vp pack",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
