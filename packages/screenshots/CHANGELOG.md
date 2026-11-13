@@ -1,5 +1,11 @@
 # @t3code-gateway/screenshots
 
+## 0.8.0
+
+### Patch Changes
+
+- @t3code-gateway/contracts@0.8.0
+
 ## 0.7.4
 
 ### Patch Changes
