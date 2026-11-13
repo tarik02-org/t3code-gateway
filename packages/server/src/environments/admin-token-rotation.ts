@@ -1,7 +1,4 @@
-import type {
-  EnvironmentAdminTokenStatus,
-  EnvironmentClientSession,
-} from "@t3code-gateway/contracts/schemas";
+import type { EnvironmentAdminTokenStatus } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -23,6 +20,7 @@ import {
   ADMIN_TOKEN_SWEEP_TIMEOUT,
 } from "./constants.ts";
 import {
+  type AdminTokenSession,
   createPairingCredential,
   exchangePairingCodeForBearerAccessToken,
   revokeClientSession,
@@ -41,7 +39,7 @@ const AdminTokenFailureFromJsonString = Schema.fromJsonString(AdminTokenFailure)
 const encodeAdminTokenFailure = Schema.encodeSync(AdminTokenFailureFromJsonString);
 const decodeAdminTokenFailure = Schema.decodeSync(AdminTokenFailureFromJsonString);
 
-const adminSessionWithRequiredScopes = (session: EnvironmentClientSession) => {
+const adminSessionWithRequiredScopes = (session: AdminTokenSession) => {
   const missingScope = ADMIN_TOKEN_SCOPES.find((scope) => !session.scopes.includes(scope));
   return missingScope === undefined
     ? Effect.succeed(session)

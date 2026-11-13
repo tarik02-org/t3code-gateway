@@ -92,3 +92,13 @@ export const mcpTokens = sqliteTable("mcp_tokens", {
   expiresAt: text("expires_at"),
   createdAt: text("created_at").notNull(),
 });
+
+/** The client sessions an environment last reported over its auth-access stream. */
+export const environmentClientSessions = sqliteTable("environment_client_sessions", {
+  environmentId: text("environment_id")
+    .primaryKey()
+    .references(() => environments.environmentId, { onDelete: "cascade" }),
+  /** JSON array of `EnvironmentClientSession`, without the gateway's own role annotations. */
+  sessionsJson: text("sessions_json").notNull(),
+  syncedAt: text("synced_at").notNull(),
+});

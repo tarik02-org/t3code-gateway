@@ -6,13 +6,13 @@ import type {
 } from "@t3code-gateway/contracts/schemas";
 import { McpFailure } from "@t3code-gateway/contracts/schemas";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 
 import { hashSessionToken } from "../auth/session.ts";
@@ -29,9 +29,6 @@ const LAST_USED_RESOLUTION = "1 minute";
 const EnvironmentIdsFromJson = Schema.fromJsonString(Schema.Array(Schema.String));
 const encodeEnvironmentIds = Schema.encodeSync(EnvironmentIdsFromJson);
 const decodeEnvironmentIds = Schema.decodeSync(EnvironmentIdsFromJson);
-
-const platformFailure = (error: PlatformError.PlatformError) =>
-  Effect.fail(new DatabaseError({ operation: "mcpGrant", reason: "unknown", cause: error }));
 
 /** Who is calling the relay, as resolved from their bearer token. */
 export interface McpCaller {
@@ -56,8 +53,8 @@ export const grantRecord = (row: McpGrantRow): McpGrant => ({
 
 /** A new random bearer token and the hash the gateway stores for it. */
 export const createBearerToken = Effect.gen(function* () {
-  const crypto = yield* Crypto.Crypto;
-  const token = `${TOKEN_PREFIX}${Base64Url.encode(yield* crypto.randomBytes(32))}`;
+  const random = yield* SecureRandom.SecureRandom;
+  const token = `${TOKEN_PREFIX}${Base64Url.encode(yield* random.randomBytes(32))}`;
   return { token, tokenHash: yield* hashSessionToken(token) };
 });
 
@@ -86,7 +83,8 @@ export class McpGrants extends Context.Service<
 export const make = Effect.gen(function* () {
   const grants = yield* McpGrantRepository;
   const environments = yield* EnvironmentRepository;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
 
   const list = Effect.gen(function* () {
     yield* grants.deleteExpired(DateTime.formatIso(yield* DateTime.now));
@@ -139,10 +137,11 @@ export const make = Effect.gen(function* () {
           ? null
           : DateTime.formatIso(DateTime.add(now, { days: input.expiresInDays }));
       const { token, tokenHash } = yield* createBearerToken.pipe(
-        Effect.provideService(Crypto.Crypto, crypto),
+        Effect.provideService(SecureRandom.SecureRandom, random),
+        Effect.provideService(Digest.Digest, digests),
       );
       const row: McpGrantRow = {
-        grantId: yield* crypto.randomUUIDv4(),
+        grantId: yield* random.uuidV4(),
         kind: "token",
         label: grant.label,
         access: input.access,
@@ -157,7 +156,7 @@ export const make = Effect.gen(function* () {
         { tokenHash, grantId: row.grantId, kind: "access", expiresAt, createdAt },
       ]);
       return { grant: grantRecord(row), token } satisfies CreatedMcpToken;
-    }).pipe(Effect.catchTags({ PlatformError: platformFailure }));
+    });
 
   const revoke = (grantId: string) =>
     Effect.gen(function* () {
@@ -171,8 +170,8 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const now = yield* DateTime.now;
       const tokenHash = yield* hashSessionToken(bearerToken).pipe(
-        Effect.provideService(Crypto.Crypto, crypto),
-        Effect.catchTags({ PlatformError: platformFailure }),
+        Effect.provideService(SecureRandom.SecureRandom, random),
+        Effect.provideService(Digest.Digest, digests),
       );
       const row = yield* grants.findGrantByTokenHash(tokenHash, DateTime.formatIso(now));
       if (row === undefined) {

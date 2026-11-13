@@ -4,12 +4,12 @@ import type {
 } from "@t3code-gateway/contracts/schemas";
 import type { McpFailure } from "@t3code-gateway/contracts/schemas";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
-import type * as PlatformError from "effect/PlatformError";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
@@ -246,9 +246,6 @@ const tokenResponse = (accessToken: string, refreshToken: string) => ({
   scope: SCOPE,
 });
 
-const platformFailure = (error: PlatformError.PlatformError) =>
-  Effect.fail(new DatabaseError({ operation: "mcpGrant", reason: "unknown", cause: error }));
-
 export class McpOAuth extends Context.Service<
   McpOAuth,
   {
@@ -288,7 +285,8 @@ export const make = Effect.gen(function* () {
   const secrets = yield* SecretEncryption;
   const grants = yield* McpGrants;
   const grantRepository = yield* McpGrantRepository;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
   const pendingCodes = new Map<string, PendingCode>();
 
   const sealFailure = Effect.mapError(
@@ -429,9 +427,7 @@ export const make = Effect.gen(function* () {
           pendingCodes.delete(code);
         }
       }
-      const code = Base64Url.encode(
-        yield* crypto.randomBytes(32).pipe(Effect.catchTags({ PlatformError: platformFailure })),
-      );
+      const code = Base64Url.encode(yield* random.randomBytes(32));
       pendingCodes.set(code, {
         authorization,
         resource: urls.resource,
@@ -458,16 +454,16 @@ export const make = Effect.gen(function* () {
           createdAt: DateTime.formatIso(now),
         },
       })),
-      Effect.provideService(Crypto.Crypto, crypto),
-      Effect.catchTags({ PlatformError: platformFailure }),
+      Effect.provideService(SecureRandom.SecureRandom, random),
+      Effect.provideService(Digest.Digest, digests),
     );
 
   const issueTokens = (grantId: string, now: DateTime.Utc) =>
     Effect.gen(function* () {
       const access = yield* issueAccessToken(grantId, now);
       const refresh = yield* createBearerToken.pipe(
-        Effect.provideService(Crypto.Crypto, crypto),
-        Effect.catchTags({ PlatformError: platformFailure }),
+        Effect.provideService(SecureRandom.SecureRandom, random),
+        Effect.provideService(Digest.Digest, digests),
       );
       return {
         rows: [
@@ -518,16 +514,15 @@ export const make = Effect.gen(function* () {
       if (!CODE_VERIFIER.test(request.code_verifier)) {
         return yield* tokenError("invalid_request", "The code verifier is malformed");
       }
-      const challenge = yield* crypto
-        .digest("SHA-256", new TextEncoder().encode(request.code_verifier))
-        .pipe(Effect.catchTags({ PlatformError: platformFailure }));
+      const challenge = yield* digests.digest(
+        Digest.sha256,
+        new TextEncoder().encode(request.code_verifier),
+      );
       if (Base64Url.encode(challenge) !== authorization.codeChallenge) {
         return yield* tokenError("invalid_grant", "The code verifier does not match the challenge");
       }
 
-      const grantId = yield* crypto
-        .randomUUIDv4()
-        .pipe(Effect.catchTags({ PlatformError: platformFailure }));
+      const grantId = yield* random.uuidV4();
       const tokens = yield* issueTokens(grantId, now);
       yield* grantRepository.createGrant(
         {
@@ -554,8 +549,8 @@ export const make = Effect.gen(function* () {
       }
       const now = yield* DateTime.now;
       const usedHash = yield* hashSessionToken(request.refresh_token).pipe(
-        Effect.provideService(Crypto.Crypto, crypto),
-        Effect.catchTags({ PlatformError: platformFailure }),
+        Effect.provideService(SecureRandom.SecureRandom, random),
+        Effect.provideService(Digest.Digest, digests),
       );
       const grant = yield* grantRepository.findGrantByRefreshTokenHash(
         usedHash,
@@ -583,8 +578,8 @@ export const make = Effect.gen(function* () {
 
   const revoke = (token: string) =>
     hashSessionToken(token).pipe(
-      Effect.provideService(Crypto.Crypto, crypto),
-      Effect.catchTags({ PlatformError: platformFailure }),
+      Effect.provideService(SecureRandom.SecureRandom, random),
+      Effect.provideService(Digest.Digest, digests),
       Effect.flatMap(grantRepository.deleteToken),
     );
 

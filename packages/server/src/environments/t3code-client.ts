@@ -1,10 +1,7 @@
-import type {
-  EnvironmentClientSession,
-  McpAccess,
-  RevokeEnvironmentClientResponse,
-} from "@t3code-gateway/contracts/schemas";
+import type { McpAccess, RevokeEnvironmentClientResponse } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -20,41 +17,17 @@ import { joinBaseUrl } from "./urls.ts";
 
 const ENVIRONMENT_DESCRIPTOR_PATH = "/.well-known/t3/environment";
 const OAUTH_TOKEN_PATH = "/oauth/token";
-const CLIENTS_PATH = "/api/auth/clients";
+const SESSION_PATH = "/api/auth/session";
 const CLIENTS_REVOKE_PATH = "/api/auth/clients/revoke";
 const PAIRING_TOKEN_PATH = "/api/auth/pairing-token";
 
-const EnvironmentClientMetadataDeviceType = Schema.Literals([
-  "desktop",
-  "mobile",
-  "tablet",
-  "bot",
-  "unknown",
-]);
-
-const T3ClientSession = Schema.Struct({
-  sessionId: Schema.String,
-  subject: Schema.String,
+const T3AuthSessionState = Schema.Struct({
+  authenticated: Schema.Boolean,
   // `scopes` lists only the scopes older clients know; `permissions` is the whole grant.
-  scopes: Schema.Array(Schema.String),
+  scopes: Schema.optional(Schema.Array(Schema.String)),
   permissions: Schema.optional(Schema.Array(Schema.String)),
-  method: Schema.Literals(["browser-session-cookie", "bearer-access-token", "dpop-access-token"]),
-  client: Schema.Struct({
-    label: Schema.optional(Schema.String),
-    ipAddress: Schema.optional(Schema.String),
-    userAgent: Schema.optional(Schema.String),
-    deviceType: EnvironmentClientMetadataDeviceType,
-    os: Schema.optional(Schema.String),
-    browser: Schema.optional(Schema.String),
-  }),
-  issuedAt: Schema.String,
-  expiresAt: Schema.DateTimeUtcFromString,
-  lastConnectedAt: Schema.NullOr(Schema.String),
-  connected: Schema.Boolean,
-  current: Schema.Boolean,
+  expiresAt: Schema.optional(Schema.DateTimeUtcFromString),
 });
-
-const T3ClientSessionList = Schema.Array(T3ClientSession);
 
 const T3ClientSessionRevokeResult = Schema.Struct({
   revoked: Schema.Boolean,
@@ -155,23 +128,68 @@ export const fetchEnvironmentDescriptor = (
     return yield* readJsonBody(body);
   });
 
+/** The admin token's own session, as `/api/auth/session` and the token's claims report it. */
+export interface AdminTokenSession {
+  readonly sessionId: string;
+  readonly scopes: ReadonlyArray<string>;
+  readonly expiresAt: string;
+}
+
 export const validateAdminBearerToken = (
   client: HttpClient.HttpClient,
   internalHttpBaseUrl: string,
   adminBearerToken: string,
 ) =>
-  listClientSessions(client, internalHttpBaseUrl, adminBearerToken).pipe(
-    Effect.flatMap((sessions) => {
-      const current = sessions.find((session) => session.current);
-      return current === undefined
-        ? Effect.fail(
+  Effect.gen(function* () {
+    const url = joinBaseUrl(internalHttpBaseUrl, SESSION_PATH);
+    const response = yield* client.get(url, { headers: bearerAuthHeaders(adminBearerToken) }).pipe(
+      Effect.catchTags({
+        HttpClientError: (error) =>
+          Effect.fail(
             new EnvironmentFailure({
-              message: "Environment did not identify the current admin token session",
+              message: environmentHttpClientFailureMessage("check admin token", url, error),
             }),
-          )
-        : Effect.succeed(current);
-    }),
-  );
+          ),
+      }),
+    );
+
+    if (response.status === 401 || response.status === 403) {
+      return yield* new EnvironmentFailure({
+        message: "Admin bearer token was rejected by the environment",
+        status: response.status,
+      });
+    }
+
+    if (response.status !== 200) {
+      return yield* new EnvironmentFailure({
+        message: `Admin token check failed with status ${response.status}`,
+      });
+    }
+
+    const session = yield* decodeEnvironmentJson(
+      T3AuthSessionState,
+      yield* readResponseText(response),
+      "Environment returned an invalid auth session",
+    );
+    // The endpoint answers anonymous callers too, so a rejected token reads as unauthenticated.
+    if (!session.authenticated) {
+      return yield* new EnvironmentFailure({
+        message: "Admin bearer token was rejected by the environment",
+        status: 401,
+      });
+    }
+    if (session.expiresAt === undefined) {
+      return yield* new EnvironmentFailure({
+        message: "Environment did not report when the admin token expires",
+      });
+    }
+
+    return {
+      sessionId: yield* readSessionId(adminBearerToken),
+      scopes: session.permissions ?? session.scopes ?? [],
+      expiresAt: DateTime.formatIso(session.expiresAt),
+    } satisfies AdminTokenSession;
+  });
 
 export const exchangePairingCodeForBearerToken = (
   client: HttpClient.HttpClient,
@@ -341,29 +359,6 @@ const bearerAuthHeaders = (adminBearerToken: string) => ({
   authorization: `Bearer ${adminBearerToken}`,
 });
 
-const mapClientSession = (session: typeof T3ClientSession.Type): EnvironmentClientSession => ({
-  sessionId: session.sessionId,
-  subject: session.subject,
-  scopes: session.permissions ?? session.scopes,
-  method: session.method,
-  client: session.client,
-  issuedAt: session.issuedAt,
-  expiresAt: DateTime.formatIso(session.expiresAt),
-  lastConnectedAt: session.lastConnectedAt,
-  connected: session.connected,
-  current: session.current,
-});
-
-const decodeClientSessions = (body: unknown) =>
-  Schema.decodeUnknownEffect(T3ClientSessionList)(body).pipe(
-    Effect.catchTags({
-      SchemaError: () =>
-        Effect.fail(
-          new EnvironmentFailure({ message: "Environment returned invalid client sessions" }),
-        ),
-    }),
-  );
-
 const decodeClientSessionRevokeResult = (body: unknown) =>
   Schema.decodeUnknownEffect(T3ClientSessionRevokeResult)(body).pipe(
     Effect.catchTags({
@@ -373,47 +368,6 @@ const decodeClientSessionRevokeResult = (body: unknown) =>
         ),
     }),
   );
-
-export const listClientSessions = (
-  client: HttpClient.HttpClient,
-  internalHttpBaseUrl: string,
-  adminBearerToken: string,
-) =>
-  Effect.gen(function* () {
-    const url = joinBaseUrl(internalHttpBaseUrl, CLIENTS_PATH);
-    const response = yield* client
-      .get(url, {
-        headers: bearerAuthHeaders(adminBearerToken),
-      })
-      .pipe(
-        Effect.catchTags({
-          HttpClientError: (error) =>
-            Effect.fail(
-              new EnvironmentFailure({
-                message: environmentHttpClientFailureMessage("list client sessions", url, error),
-              }),
-            ),
-        }),
-      );
-
-    if (response.status === 401 || response.status === 403) {
-      return yield* new EnvironmentFailure({
-        message: "Admin bearer token was rejected by the environment",
-        status: response.status,
-      });
-    }
-
-    if (response.status !== 200) {
-      return yield* new EnvironmentFailure({
-        message: `Client session list failed with status ${response.status}`,
-      });
-    }
-
-    const body = yield* readResponseText(response);
-    const parsed = yield* readJsonBody(body);
-    const sessions = yield* decodeClientSessions(parsed);
-    return sessions.map(mapClientSession);
-  });
 
 export const revokeClientSession = (
   client: HttpClient.HttpClient,
@@ -621,20 +575,16 @@ const registerMcpOAuthClient = (
   });
 
 const createPkcePair = Effect.gen(function* () {
-  const crypto = yield* Crypto.Crypto;
-  const verifier = Base64Url.encode(yield* crypto.randomBytes(32));
-  const challenge = yield* crypto.digest("SHA-256", new TextEncoder().encode(verifier));
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
+  const verifier = Base64Url.encode(yield* random.randomBytes(32));
+  const challenge = yield* digests.digest(Digest.sha256, new TextEncoder().encode(verifier));
   return {
     verifier,
     challenge: Base64Url.encode(challenge),
-    state: Base64Url.encode(yield* crypto.randomBytes(16)),
+    state: Base64Url.encode(yield* random.randomBytes(16)),
   };
-}).pipe(
-  Effect.catchTags({
-    PlatformError: () =>
-      Effect.fail(new EnvironmentFailure({ message: "Could not create a PKCE challenge" })),
-  }),
-);
+});
 
 /** Reads the authorization code from the redirect the approval decision returns. */
 const readAuthorizationCode = (redirectTo: string, state: string) => {
@@ -761,7 +711,7 @@ const exchangeMcpAuthorizationCode = (
 /** T3 Code session tokens are `<base64url JSON claims>.<signature>`; the claims name the session to revoke. */
 const readSessionId = (accessToken: string) => {
   const unreadable = new EnvironmentFailure({
-    message: "Environment returned an unreadable MCP access token",
+    message: "Environment returned an unreadable access token",
   });
   const [claims = ""] = accessToken.split(".");
   const decoded = Base64Url.decodeString(claims);

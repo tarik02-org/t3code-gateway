@@ -23,6 +23,7 @@ import { EnvironmentRepository, type EnvironmentRow } from "../db/environment-re
 import { DatabaseError } from "../db/errors.ts";
 import { McpUpstreamCredentials } from "../mcp/upstream-credentials.ts";
 import { AdminTokenRotation, adminTokenStatus } from "./admin-token-rotation.ts";
+import { EnvironmentClientSessions } from "./client-sessions.ts";
 import {
   decodeStringArrayJson,
   decodeUnknownJson,
@@ -35,7 +36,6 @@ import { computePublicUrls } from "./urls.ts";
 import {
   createBearerTokenForClient,
   createPairingCredential,
-  listClientSessions,
   revokeClientSession,
 } from "./t3code-client.ts";
 
@@ -121,6 +121,7 @@ export const make = Effect.gen(function* () {
   const secrets = yield* SecretEncryption;
   const adminTokens = yield* AdminTokenRotation;
   const mcpCredentials = yield* McpUpstreamCredentials;
+  const clientSessions = yield* EnvironmentClientSessions;
   const config = yield* GatewayRuntimeConfig;
   const client = yield* HttpClient.HttpClient;
   const validationContext = { environmentRepository, config, client };
@@ -391,12 +392,7 @@ export const make = Effect.gen(function* () {
         return yield* new EnvironmentFailure({ message: "Environment not found", status: 404 });
       }
 
-      const adminBearerToken = yield* adminTokens.ensureFresh(environmentId);
-      if (adminBearerToken.length === 0) {
-        return [];
-      }
-
-      const sessions = yield* listClientSessions(client, row.endpoint, adminBearerToken);
+      const sessions = yield* clientSessions.list(environmentId);
       const relaySessions = yield* mcpCredentials.sessionIds(environmentId);
 
       return sessions.map((session) =>
@@ -534,9 +530,12 @@ export const make = Effect.gen(function* () {
   return EnvironmentService.of({
     list,
     get,
-    create,
-    update,
-    remove,
+    create: (input) => create(input).pipe(Effect.tap(() => clientSessions.reconcile)),
+    // An update may carry a new admin token, so the subscription reconnects with it.
+    update: (environmentId, input) =>
+      update(environmentId, input).pipe(Effect.tap(() => clientSessions.restart(environmentId))),
+    remove: (environmentId) =>
+      remove(environmentId).pipe(Effect.tap(() => clientSessions.reconcile)),
     validate,
     validateForEdit,
     listClients,

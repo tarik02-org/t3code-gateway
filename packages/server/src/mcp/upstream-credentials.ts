@@ -1,7 +1,8 @@
 import type { McpAccess, McpUpstreamCredentialStatus } from "@t3code-gateway/contracts/schemas";
 import { EnvironmentFailure } from "@t3code-gateway/contracts/schemas";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -77,7 +78,8 @@ export const make = Effect.gen(function* () {
   const adminTokens = yield* AdminTokenRotation;
   const secrets = yield* SecretEncryption;
   const client = yield* HttpClient.HttpClient;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
   const locks = new Map<string, Semaphore.Semaphore>();
 
   const revokeSession = (environmentId: string, endpoint: string, sessionId: string) =>
@@ -156,7 +158,10 @@ export const make = Effect.gen(function* () {
       const minted = yield* createMcpClientToken(client, environment.endpoint, adminToken, {
         label: credentialLabel(access),
         access,
-      }).pipe(Effect.provideService(Crypto.Crypto, crypto));
+      }).pipe(
+        Effect.provideService(SecureRandom.SecureRandom, random),
+        Effect.provideService(Digest.Digest, digests),
+      );
       const tokenEncrypted = yield* secrets
         .encrypt(minted.accessToken)
         .pipe(Effect.mapError(secretFailure));

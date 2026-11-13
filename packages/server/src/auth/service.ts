@@ -1,7 +1,8 @@
 import { AuthFailure } from "@t3code-gateway/contracts/schemas";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -52,7 +53,8 @@ const toAuthenticatedUser = (row: { id: string; username: string }): Authenticat
 
 const makeAuthService = Effect.gen(function* () {
   const authRepository = yield* AuthRepository;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
+  const digests = yield* Digest.Digest;
   const gatewayCrypto = yield* GatewayCrypto;
 
   const bootstrapFirstUser = () =>
@@ -62,8 +64,8 @@ const makeAuthService = Effect.gen(function* () {
         return;
       }
 
-      const userId = yield* crypto.randomUUIDv4();
-      const generatedPassword = Base64Url.encode(yield* crypto.randomBytes(24));
+      const userId = yield* random.uuidV4();
+      const generatedPassword = Base64Url.encode(yield* random.randomBytes(24));
       const passwordHash = yield* hashPassword(gatewayCrypto, generatedPassword);
       const timestamp = DateTime.formatIso(DateTime.nowUnsafe());
 
@@ -84,27 +86,23 @@ const makeAuthService = Effect.gen(function* () {
           Effect.fail(
             new DatabaseError({ operation: "authUser", reason: "unknown", cause: error }),
           ),
-        PlatformError: (error) =>
-          Effect.fail(
-            new DatabaseError({ operation: "authUser", reason: "unknown", cause: error }),
-          ),
       }),
     );
 
   const hashSessionTokenLocal = (token: string) =>
     Effect.gen(function* () {
-      const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(token));
+      const digest = yield* digests.digest(Digest.sha256, new TextEncoder().encode(token));
       return Hex.encode(digest);
     });
 
   const createSessionTokenLocal = () =>
     Effect.gen(function* () {
-      const bytes = yield* crypto.randomBytes(32);
+      const bytes = yield* random.randomBytes(32);
       return Hex.encode(bytes);
     });
   const createSession = (userId: string) =>
     Effect.gen(function* () {
-      const sessionId = yield* crypto.randomUUIDv4();
+      const sessionId = yield* random.uuidV4();
       const sessionToken = yield* createSessionTokenLocal();
       const sessionTokenHash = yield* hashSessionTokenLocal(sessionToken);
       const expiresAt = DateTime.formatIso(
@@ -121,14 +119,7 @@ const makeAuthService = Effect.gen(function* () {
       });
 
       return sessionToken;
-    }).pipe(
-      Effect.catchTags({
-        PlatformError: (error) =>
-          Effect.fail(
-            new DatabaseError({ operation: "authSession", reason: "unknown", cause: error }),
-          ),
-      }),
-    );
+    });
 
   const resolveSession = (sessionToken: string | undefined) =>
     Effect.gen(function* () {
@@ -150,14 +141,7 @@ const makeAuthService = Effect.gen(function* () {
       }
 
       return toAuthenticatedUser(row);
-    }).pipe(
-      Effect.catchTags({
-        PlatformError: (error) =>
-          Effect.fail(
-            new DatabaseError({ operation: "authSession", reason: "unknown", cause: error }),
-          ),
-      }),
-    );
+    });
 
   const login = (username: string, password: string) =>
     Effect.gen(function* () {
@@ -191,14 +175,7 @@ const makeAuthService = Effect.gen(function* () {
 
       const sessionTokenHash = yield* hashSessionTokenLocal(sessionToken);
       yield* authRepository.deleteSessionByTokenHash(sessionTokenHash);
-    }).pipe(
-      Effect.catchTags({
-        PlatformError: (error) =>
-          Effect.fail(
-            new DatabaseError({ operation: "authSession", reason: "unknown", cause: error }),
-          ),
-      }),
-    );
+    });
 
   const currentUser = (sessionToken: string | undefined) => resolveSession(sessionToken);
 
@@ -243,10 +220,6 @@ const makeAuthService = Effect.gen(function* () {
     }).pipe(
       Effect.catchTags({
         GatewayCryptoError: (error) => Effect.fail(new AuthFailure({ message: error.message })),
-        PlatformError: (error) =>
-          Effect.fail(
-            new DatabaseError({ operation: "authSession", reason: "unknown", cause: error }),
-          ),
       }),
     );
 
