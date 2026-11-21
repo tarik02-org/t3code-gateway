@@ -24,8 +24,8 @@ const bundledReleases = [
   {
     channel: "nightly",
     // renovate: datasource=github-release-attachments depName=t3code-web-nightly packageName=tarik02-org/t3code-web-builds
-    tag: "v0.1.8-nightly.20261109.4392",
-    sha256: "501664947867e9a3631bbce7379818d49f82bfd248c9b92d0d47e7668aa672d7",
+    tag: "v0.1.12-nightly.20261120.4994",
+    sha256: "2d489a1e1f09804ca879cb94cbb0180e46ce4d8bd688707ac2fa08196a60bd1c",
   },
 ] as const;
 
