@@ -3,12 +3,21 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 const databaseName = "t3code:connection-runtime";
-const databaseVersion = 4;
+const databaseVersion = 5;
 const storeName = "catalog";
-const requiredStoreNames = ["catalog", "shell", "thread", "server-config", "vcs-refs"] as const;
+const queryStoreName = "query";
+const queryUpdatedIndexName = "environment-updated";
+const requiredStoreNames = [
+  "catalog",
+  "shell",
+  "thread",
+  "server-config",
+  "vcs-refs",
+  queryStoreName,
+] as const;
 // Caches T3 Code keeps per environment: keyed by its id, or by `<id>:<key>`.
 const environmentKeyedStoreNames = ["shell", "server-config"] as const;
-const environmentPrefixedStoreNames = ["thread", "vcs-refs"] as const;
+const environmentPrefixedStoreNames = ["thread", "vcs-refs", queryStoreName] as const;
 const documentKey = "document";
 const gatewayPrefix = "gateway:";
 const learnedPrefix = "learned:";
@@ -103,21 +112,51 @@ const parseCatalog = (value: unknown): CatalogDocument => {
 const createMissingStores = (database: IDBDatabase) => {
   for (const name of requiredStoreNames) {
     if (!database.objectStoreNames.contains(name)) {
-      database.createObjectStore(name);
+      const store = database.createObjectStore(name);
+      if (name === queryStoreName) {
+        store.createIndex(queryUpdatedIndexName, ["environmentId", "updatedAt", "bytes"]);
+      }
     }
   }
 };
 
-const openDatabase = () =>
+const openDatabaseRequest = (version?: number) =>
   new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(databaseName, databaseVersion);
-    request.addEventListener("upgradeneeded", () => {
-      createMissingStores(request.result);
-    });
+    const request =
+      version === undefined ? indexedDB.open(databaseName) : indexedDB.open(databaseName, version);
+    if (version !== undefined) {
+      request.addEventListener("upgradeneeded", () => {
+        createMissingStores(request.result);
+      });
+    }
     request.addEventListener("success", () => resolve(request.result));
     request.addEventListener("error", () => reject(request.error));
     request.addEventListener("blocked", () => reject(new Error("IndexedDB open was blocked.")));
   });
+
+// Open at whatever schema version T3 Code already initialized so older (v4) and newer (v6+)
+// T3 Code builds work without VersionError or bumping an existing database ahead of them.
+const openExistingCatalogDatabase = async (): Promise<IDBDatabase | null> => {
+  const database = await openDatabaseRequest();
+  if (database.objectStoreNames.contains(storeName)) {
+    return database;
+  }
+  database.close();
+  return null;
+};
+
+const openOrCreateCatalogDatabase = async (): Promise<IDBDatabase> => {
+  const existing = await openExistingCatalogDatabase();
+  if (existing !== null) {
+    return existing;
+  }
+  const database = await openDatabaseRequest(databaseVersion);
+  if (!database.objectStoreNames.contains(storeName)) {
+    database.close();
+    throw new Error("T3 Code's local database is missing the catalog store.");
+  }
+  return database;
+};
 
 const readCatalog = (database: IDBDatabase) =>
   new Promise<unknown>((resolve, reject) => {
@@ -157,7 +196,10 @@ const upsertByConnectionId = (
 };
 
 export async function listInstalledT3CodeEnvironmentIds(): Promise<ReadonlySet<string>> {
-  const database = await openDatabase();
+  const database = await openExistingCatalogDatabase();
+  if (database === null) {
+    return new Set();
+  }
   try {
     const raw = await readCatalog(database);
     const environmentIds = new Set<string>();
@@ -181,7 +223,7 @@ export async function listInstalledT3CodeEnvironmentIds(): Promise<ReadonlySet<s
 }
 
 export async function installT3CodeCatalogEntry(entry: T3CodeCatalogEntryResponse): Promise<void> {
-  const database = await openDatabase();
+  const database = await openOrCreateCatalogDatabase();
   try {
     const catalog = parseCatalog(await readCatalog(database));
     await writeCatalog(database, {
@@ -245,25 +287,32 @@ const removeGatewayRoutes = (catalog: CatalogDocument, environmentId: string) =>
 };
 
 export async function removeT3CodeCatalogEnvironment(environmentId: string): Promise<void> {
-  const database = await openDatabase();
+  const database = await openExistingCatalogDatabase();
+  if (database === null) {
+    return;
+  }
   try {
     const { catalog, environmentRemoved } = removeGatewayRoutes(
       parseCatalog(await readCatalog(database)),
       environmentId,
     );
-    const storeNames = environmentRemoved ? [...requiredStoreNames] : [storeName];
+    const keyedStores = environmentRemoved
+      ? environmentKeyedStoreNames.filter((name) => database.objectStoreNames.contains(name))
+      : [];
+    const prefixedStores = environmentRemoved
+      ? environmentPrefixedStoreNames.filter((name) => database.objectStoreNames.contains(name))
+      : [];
+    const storeNames = [storeName, ...keyedStores, ...prefixedStores];
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(storeNames, "readwrite");
       transaction.objectStore(storeName).put(JSON.stringify(catalog), documentKey);
-      if (environmentRemoved) {
-        for (const name of environmentKeyedStoreNames) {
-          transaction.objectStore(name).delete(environmentId);
-        }
-        for (const name of environmentPrefixedStoreNames) {
-          transaction
-            .objectStore(name)
-            .delete(IDBKeyRange.bound(`${environmentId}:`, `${environmentId}:\uffff`));
-        }
+      for (const name of keyedStores) {
+        transaction.objectStore(name).delete(environmentId);
+      }
+      for (const name of prefixedStores) {
+        transaction
+          .objectStore(name)
+          .delete(IDBKeyRange.bound(`${environmentId}:`, `${environmentId}:\uffff`));
       }
       transaction.addEventListener("complete", () => resolve());
       transaction.addEventListener("error", () => reject(transaction.error));

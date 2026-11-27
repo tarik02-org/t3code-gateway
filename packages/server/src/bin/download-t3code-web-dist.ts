@@ -18,14 +18,14 @@ const bundledReleases = [
   {
     channel: "stable",
     // renovate: datasource=github-release-attachments depName=t3code-web-stable packageName=tarik02-org/t3code-web-builds
-    tag: "v0.1.7",
-    sha256: "93201576f7cdddceb1e704362fc2a989a3dd3c51498b26258401626200d8efca",
+    tag: "v0.1.13",
+    sha256: "ece7a6940673c52c8e1702ce43a90006cf30459ff76caa3e88d8337dd161a805",
   },
   {
     channel: "nightly",
     // renovate: datasource=github-release-attachments depName=t3code-web-nightly packageName=tarik02-org/t3code-web-builds
-    tag: "v0.1.8-nightly.20261109.4392",
-    sha256: "501664947867e9a3631bbce7379818d49f82bfd248c9b92d0d47e7668aa672d7",
+    tag: "v0.1.14-nightly.20261127.5332",
+    sha256: "0567f03cc569523724da14f7f13296831ec27cddd7c199aba3a85ad8a14857e6",
   },
 ] as const;
 

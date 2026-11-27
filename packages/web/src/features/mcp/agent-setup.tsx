@@ -6,13 +6,12 @@ import { agentSnippets } from "./agent-snippets.ts";
 
 /** Renders `code` spans in a caption written with backticks. */
 function Caption({ text }: Readonly<{ text: string }>) {
-  const parts = text
-    .split("`")
-    .reduce<Array<{ start: number; part: string; code: boolean }>>((acc, part, index) => {
-      const previous = acc.at(-1);
-      const start = previous === undefined ? 0 : previous.start + previous.part.length + 1;
-      return [...acc, { start, part, code: index % 2 === 1 }];
-    }, []);
+  const parts: Array<{ start: number; part: string; code: boolean }> = [];
+  let start = 0;
+  for (const [index, part] of text.split("`").entries()) {
+    parts.push({ start, part, code: index % 2 === 1 });
+    start += part.length + 1;
+  }
   return (
     <p className="text-xs leading-relaxed text-muted-foreground">
       {parts.map(({ start, part, code }) =>
